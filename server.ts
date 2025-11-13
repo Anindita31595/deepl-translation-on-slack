@@ -94,12 +94,12 @@ async function handleReactionAdded(event: any) {
       return;
     }
 
-    // Fetch the target message
-    const messageResponse = await slackApi("conversations.replies", {
+   // Fetch the target message using conversations.history
+    // Get recent messages and find the one with matching timestamp
+    const messageResponse = await slackApi("conversations.history", {
       channel: channelId,
-      ts: messageTs,
-      limit: 1,
-      inclusive: true,
+      latest: messageTs,
+      limit: 50,
     });
 
     if (messageResponse.error) {
@@ -107,13 +107,59 @@ async function handleReactionAdded(event: any) {
       return;
     }
 
-    if (!messageResponse.messages || messageResponse.messages.length === 0) {
-      console.log("No message found");
-      return;
-    }
+    let targetMessage: any;
+    let threadTs: string;
 
-    const targetMessage = messageResponse.messages[0];
-    const threadTs = targetMessage.thread_ts || messageTs;
+    if (messageResponse.messages && messageResponse.messages.length > 0) {
+      // Find the message with the exact timestamp
+      targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
+      
+      if (!targetMessage) {
+        // If exact match not found, try conversations.replies (might be in a thread)
+        const threadResponse = await slackApi("conversations.replies", {
+          channel: channelId,
+          ts: messageTs,
+          limit: 1,
+          inclusive: true,
+        });
+
+        if (threadResponse.error) {
+          console.error(`Failed to fetch message from thread: ${threadResponse.error}`);
+          return;
+        }
+
+        if (!threadResponse.messages || threadResponse.messages.length === 0) {
+          console.log("No message found with timestamp:", messageTs);
+          return;
+        }
+
+        targetMessage = threadResponse.messages[0];
+        threadTs = targetMessage.thread_ts || messageTs;
+      } else {
+        threadTs = targetMessage.thread_ts || messageTs;
+      }
+    } else {
+      // If not found in history, it might be in a thread, try conversations.replies
+      const threadResponse = await slackApi("conversations.replies", {
+        channel: channelId,
+        ts: messageTs,
+        limit: 1,
+        inclusive: true,
+      });
+
+      if (threadResponse.error) {
+        console.error(`Failed to fetch message from thread: ${threadResponse.error}`);
+        return;
+      }
+
+    if (!threadResponse.messages || threadResponse.messages.length === 0) {
+        console.log("No message found");
+        return;
+      }
+
+     targetMessage = threadResponse.messages[0];
+      threadTs = targetMessage.thread_ts || messageTs;
+    }
 
     // Check if translation already exists
     const replies = await slackApi("conversations.replies", {
