@@ -242,9 +242,12 @@ async function handleReactionAdded(event: any) {
 // HTTP request handler
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
-
-  // Health check
+// Log all incoming requests for debugging
+  console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
+  
+// Health check
   if (req.method === "GET" && url.pathname === "/") {
+    console.log("Health check - returning OK");
     return new Response("OK", { status: 200 });
   }
 
@@ -259,14 +262,14 @@ async function handler(req: Request): Promise<Response> {
       const signature = req.headers.get("x-slack-signature");
 
       if (!timestamp || !signature) {
-        console.error("Missing Slack signature headers");
+        console.error("Missing Slack signature headers - timestamp:", timestamp, "signature:", signature ? "present" : "missing");
+        console.error("All headers:", Object.fromEntries(req.headers.entries()));
         return new Response("Unauthorized", { status: 401 });
       }
 
       // Verify timestamp (prevent replay attacks)
       const currentTime = Math.floor(Date.now() / 1000);
       if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
-        console.error("Request timestamp too old");
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -291,9 +294,12 @@ async function handler(req: Request): Promise<Response> {
 
       if (signature !== computedSignature) {
         console.error("Invalid Slack request signature");
+        console.error("Expected:", computedSignature.substring(0, 20) + "...");
+        console.error("Received:", signature.substring(0, 20) + "...");
         return new Response("Unauthorized", { status: 401 });
       }
-
+      console.log("Signature verified successfully");
+      
       const payload = JSON.parse(body);
 
       // Handle URL verification challenge
