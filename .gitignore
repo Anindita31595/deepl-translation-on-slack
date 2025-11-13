@@ -1,0 +1,24 @@
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+package/
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Slack CLI local files (optional)
+.slack/apps.dev.json
+.slack/apps.json
