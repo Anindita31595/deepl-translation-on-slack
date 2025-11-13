@@ -250,9 +250,11 @@ async function handler(req: Request): Promise<Response> {
 
   // Slack Events API endpoint
   if (req.method === "POST" && url.pathname === "/slack/events") {
+     console.log("Received POST request to /slack/events");
     try {
       // Verify request signature
       const body = await req.text();
+      console.log("Request body received, length:", body.length);
       const timestamp = req.headers.get("x-slack-request-timestamp");
       const signature = req.headers.get("x-slack-signature");
 
@@ -296,6 +298,7 @@ async function handler(req: Request): Promise<Response> {
 
       // Handle URL verification challenge
       if (payload.type === "url_verification") {
+        console.log("URL verification challenge received");
         return new Response(payload.challenge, {
           status: 200,
           headers: { "Content-Type": "text/plain" },
@@ -305,18 +308,24 @@ async function handler(req: Request): Promise<Response> {
       // Handle event callbacks
       if (payload.type === "event_callback") {
         const event = payload.event;
+        console.log("Event callback received, event type:", event.type);
 
         // Respond immediately to Slack (within 3 seconds)
         const response = new Response("OK", { status: 200 });
 
         // Process event asynchronously
         if (event.type === "reaction_added") {
+          console.log("Processing reaction_added event");
           handleReactionAdded(event).catch(console.error);
         }
-
+        else {
+          console.log("Event type not reaction_added, ignoring:", event.type);
+        }
         return response;
       }
-
+      
+      console.log("Unknown payload type:", payload.type);
+      
       return new Response("OK", { status: 200 });
     } catch (error) {
       console.error("Error processing request:", error);
