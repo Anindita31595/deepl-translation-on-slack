@@ -643,16 +643,16 @@ async function handler(req: Request): Promise<Response> {
         const response = new Response("OK", { status: 200 });
 
         // Process event asynchronously
-        if (event.type === "reaction_added") {
+         if (event.type === "reaction_added") {
           console.log("Processing reaction_added event");
           handleReactionAdded(event).catch(console.error);
-        }
-        else if (event.type === "reaction_removed") {
+        } else if (event.type === "reaction_removed") {
           console.log("Processing reaction_removed event");
           handleReactionRemoved(event).catch(console.error);
-        else {
-         console.log("Event type not handled, ignoring:", event.type);
+        } else {
+          console.log("Event type not handled, ignoring:", event.type);
         }
+
         return response;
       }
       
