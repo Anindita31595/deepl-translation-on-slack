@@ -72,11 +72,28 @@ async function slackApi(method: string, body: Record<string, unknown>) {
 // Handle reaction_added event
 async function handleReactionAdded(event: any) {
   try {
+    // Log full event structure for debugging
+    console.log(`=== Reaction Event Received ===`);
+    console.log(`Event structure:`, JSON.stringify({
+      reaction: event.reaction,
+      item_type: event.item?.type,
+      item_channel: event.item?.channel,
+      item_ts: event.item?.ts,
+      item_file: event.item?.file,
+      user: event.user,
+    }, null, 2));
     const reaction = event.reaction;
-    const channelId = event.item.channel;
-    const messageTs = event.item.ts;
+    const channelId = event.item?.channel;
+    const messageTs = event.item?.ts;
+    const itemType = event.item?.type;
 
-    console.log(`Reaction added: ${reaction} in channel ${channelId}`);
+     if (!channelId || !messageTs) {
+      console.error(`✗ Missing required event data: channelId=${channelId}, messageTs=${messageTs}`);
+      console.error(`Full event:`, JSON.stringify(event, null, 2));
+      return;
+    }
+
+    console.log(`Reaction added: ${reaction} in channel ${channelId}, message timestamp: ${messageTs}, item type: ${itemType}`);
 
     // Detect language from reaction
     let lang: string | undefined = undefined;
@@ -97,74 +114,147 @@ async function handleReactionAdded(event: any) {
     console.log(`✓ Language detected: ${reaction} -> ${lang.toUpperCase()}`);
     
     // Fetch the target message using conversations.history
-    // Get recent messages and find the one with matching timestamp
-    const messageResponse = await slackApi("conversations.history", {
-      channel: channelId,
-      latest: messageTs,
-      limit: 200,
-    });
-
-    if (messageResponse.error) {
-      console.error(`Failed to fetch message from history: ${messageResponse.error}`);
-      return;
-    }
-
+    // Try multiple approaches to find the message
+    
     let targetMessage: any;
     let threadTs: string = messageTs; // Default to message timestamp
+    
+    // Approach 1: Try conversations.replies with messageTs directly (in case it's a thread parent)
+    console.log(`Trying conversations.replies with messageTs directly (${messageTs})...`);
+    const directThreadResponse = await slackApi("conversations.replies", {
+      channel: channelId,
+      ts: messageTs,
+      limit: 100,
+    });
+    
+    if (directThreadResponse.error) {
+      console.log(`conversations.replies error (expected if not thread parent): ${directThreadResponse.error}`);
+    }
 
-    if (messageResponse.messages && messageResponse.messages.length > 0) {
-      // Find the message with the exact timestamp
-      targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
-      
-        if (targetMessage) {
-        // Found in history - this is a parent message
-        threadTs = targetMessage.thread_ts || messageTs;
-        console.log(`✓ Found message in history (parent message)`);
+    if (!directThreadResponse.error && directThreadResponse.messages) {
+      // Check if the first message is our target (it's the thread parent)
+      const firstMsg = directThreadResponse.messages[0];
+      if (firstMsg && firstMsg.ts === messageTs) {
+        targetMessage = firstMsg;
+        threadTs = messageTs;
+        console.log(`✓ Found message as thread parent via conversations.replies`);
         console.log(`✓ Message text exists: ${!!targetMessage.text}`);
       } else {
-        // Message not found in history - it might be a thread reply
-        // Search through recent parent messages to find which thread contains our message
-        console.log(`Message with timestamp ${messageTs} not found in history, searching threads...`);
+        // Search for our message in the thread replies
+        const reply = directThreadResponse.messages.find((msg: any) => msg.ts === messageTs);
+        if (reply) {
+          targetMessage = reply;
+          threadTs = reply.thread_ts || messageTs;
+          console.log(`✓ Found message in thread replies`);
+          console.log(`✓ Message text exists: ${!!targetMessage.text}`);
+        }
+      }
+    }
+
+    // Approach 2: If not found, try conversations.history with time range
+    if (!targetMessage) {
+      console.log(`Trying conversations.history with time range around ${messageTs}...`);
+      const messageTsNum = parseFloat(messageTs);
+      const latest = (messageTsNum + 10).toString();
+      const oldest = (messageTsNum - 10).toString();
+      console.log(`Searching between ${oldest} and ${latest}`);
+      
+      const messageResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: latest,
+        oldest: oldest,
+        inclusive: true,
+        limit: 100,
+      });
+
+   if (messageResponse.error) {
+        console.error(`✗ Failed to fetch message from history: ${messageResponse.error}`);
+      } else if (messageResponse.messages && messageResponse.messages.length > 0) {
+        console.log(`Found ${messageResponse.messages.length} messages in time range`);
+        // Log first few timestamps for debugging
+        const sampleTimestamps = messageResponse.messages.slice(0, 5).map((m: any) => m.ts);
+        console.log(`Sample timestamps found: ${sampleTimestamps.join(', ')}`);
+        console.log(`Looking for: ${messageTs}`);
         
-        // Get recent parent messages (messages without thread_ts are parents)
-        // Also check messages that have reply_count > 0 (they have threads)
-        const recentParents = messageResponse.messages
-          .filter((msg: any) => !msg.thread_ts) // Only parent messages
-          .slice(0, 30); // Check up to 30 recent threads
+        // Find the message with the exact timestamp
+        targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
         
-        let found = false;
+        if (targetMessage) {
+          threadTs = targetMessage.thread_ts || messageTs;
+          console.log(`✓ Found message in history (parent message) with exact timestamp match`);
+          console.log(`✓ Message text exists: ${!!targetMessage.text}`);
+        } else {
+          // Try to find closest match (within 1 second)
+          console.log(`No exact match, looking for closest timestamp...`);
+          const closest = messageResponse.messages.find((msg: any) => {
+            const msgTs = parseFloat(msg.ts);
+            const diff = Math.abs(msgTs - messageTsNum);
+            if (diff < 1.0) {
+              console.log(`Found close match: ${msg.ts} (diff: ${diff}s)`);
+              return true;
+            }
+            return false;
+          });
+          
+          if (closest) {
+            targetMessage = closest;
+            threadTs = closest.thread_ts || messageTs;
+            console.log(`✓ Found message with close timestamp match (${closest.ts})`);
+            console.log(`✓ Message text exists: ${!!targetMessage.text}`);
+          } else {
+            console.log(`No close match found. All timestamps in range:`);
+            messageResponse.messages.forEach((msg: any) => {
+              const diff = Math.abs(parseFloat(msg.ts) - messageTsNum);
+              console.log(`  - ${msg.ts} (diff: ${diff.toFixed(3)}s)`);
+            });
+          }
+        }
+      } else {
+         console.log(`No messages found in time range`);
+      }
+    }
+
+    // Approach 3: If still not found, search through recent threads
+    if (!targetMessage) {
+      console.log(`Searching through recent threads...`);
+      const historyResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: messageTs,
+        limit: 200,
+      });
+
+      if (!historyResponse.error && historyResponse.messages) {
+        const recentParents = historyResponse.messages
+          .filter((msg: any) => !msg.thread_ts)
+          .slice(0, 50); // Check up to 50 recent threads
+    
         for (const parent of recentParents) {
           const parentTs = parent.ts;
-          
-          // Only call conversations.replies with valid thread parent timestamps
           const threadResponse = await slackApi("conversations.replies", {
             channel: channelId,
-            ts: parentTs, // Use parent timestamp, not messageTs
+            ts: parentTs,
             limit: 100,
           });
 
          if (!threadResponse.error && threadResponse.messages) {
-            // Search for our message in this thread
+            
             const reply = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
             if (reply) {
               targetMessage = reply;
               threadTs = reply.thread_ts || parentTs;
-              found = true;
               console.log(`✓ Found message in thread (parent: ${parentTs})`);
               console.log(`✓ Message text exists: ${!!reply.text}`);
               break;
             }
-          }
-          
+          }   
         }
-    if (!found) {
-          console.error(`Message with timestamp ${messageTs} not found in history or recent threads`);
-          console.log(`Searched ${messageResponse.messages.length} messages in history and up to ${recentParents.length} threads`);
-          return;
+
         }
-      }
-    } else {
-      console.error("No messages found in channel history");
+    }
+
+    // If still not found, give up
+    if (!targetMessage) {
+      console.error(`✗ Message with timestamp ${messageTs} not found after all attempts`);
       return;
     }
 
