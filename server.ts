@@ -416,7 +416,15 @@ async function handler(req: Request): Promise<Response> {
 }
 
 // Start server using Deno's built-in serve API
-console.log(`Starting server on port ${port}...`);
-// @ts-ignore - Deno.serve is available at runtime
-Deno.serve({ port }, handler);
-console.log(`Bolt app is running on port ${port}!`);
+try {
+  console.log(`Starting server on port ${port}...`);
+  console.log(`Environment check: DEEPL_AUTH_KEY=${deeplAuthKey ? "SET" : "MISSING"}, SLACK_BOT_TOKEN=${botToken ? "SET" : "MISSING"}, SLACK_SIGNING_SECRET=${signingSecret ? "SET" : "MISSING"}`);
+  
+  // @ts-ignore - Deno.serve is available at runtime
+  Deno.serve({ port }, handler);
+  console.log(`Server is running on port ${port}!`);
+} catch (error) {
+  console.error("Failed to start server:", error);
+  // @ts-ignore
+  Deno.exit(1);
+}
