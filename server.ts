@@ -563,120 +563,128 @@ async function handleReactionRemoved(event: any) {
       return;
     }
 
-    // Get all replies in the thread to find the translation
-    // threadTs should now be a valid thread parent timestamp
-     console.log(`Fetching thread replies for thread ${threadTs} (message ts: ${messageTs})...`);
-    
-    // Verify threadTs is valid - it should be the thread parent
+    // Determine the correct thread parent timestamp
     // If targetMessage has thread_ts, that's the parent. Otherwise, targetMessage.ts is the parent.
+    let threadTs: string;
     if (targetMessage.thread_ts) {
       // Message is a reply, use its thread_ts as the parent
       threadTs = targetMessage.thread_ts;
-      console.log(`✓ Using thread parent from message.thread_ts: ${threadTs}`);
+      console.log(`✓ Message is a reply, using thread parent: ${threadTs}`);
     } else {
       // Message is a parent, use its own timestamp
       threadTs = targetMessage.ts;
-      console.log(`✓ Using message timestamp as thread parent: ${threadTs}`);
+      console.log(`✓ Message is a parent, using its timestamp: ${threadTs}`);
     }
-    
+    // Search for translation in multiple ways
+    const translationPrefix = `(${targetLang})`;
+    let translationMessage: any = null;
+
+    // Approach 1: Try conversations.replies with the thread parent
+    console.log(`Searching for translation (${targetLang}) in thread ${threadTs}...`);
     const replies = await slackApi("conversations.replies", {
       channel: channelId,
       ts: threadTs,
       limit: 100,
     });
 
-    if (replies.error) {
-      // If error is "thread_not_found", it means there are no replies yet
-      if (replies.error === "thread_not_found") {
-        console.log(`No thread replies found (thread might be empty or message has no replies)`);
-        return;
-      }
-      console.error(`✗ Failed to fetch thread replies: ${replies.error}`);
-      console.error(`Thread timestamp used: ${threadTs}`);
-       console.error(`Target message: ts=${targetMessage.ts}, thread_ts=${targetMessage.thread_ts || 'none'}`);
+    if (!replies.error && replies.messages && replies.messages.length > 0) {
+      console.log(`✓ Found ${replies.messages.length} messages in thread, searching...`);
       
-      // If we get invalid_arguments, the threadTs might not be a valid thread parent
-      // Try using the message timestamp directly if it's different
-      if (replies.error === "invalid_arguments" && threadTs !== messageTs) {
-        console.log(`Trying with message timestamp directly...`);
-        const retryReplies = await slackApi("conversations.replies", {
-          channel: channelId,
-          ts: messageTs,
-          limit: 100,
-        });
-        
-        if (!retryReplies.error && retryReplies.messages) {
-          // Use this instead
-          const translationPrefix = `(${targetLang})`;
-          let translationMessage: any = null;
-          
-          for (const msg of retryReplies.messages) {
-            if (msg.text && msg.text.startsWith(translationPrefix)) {
-              const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
-              if (isBotMessage) {
-                translationMessage = msg;
-                break;
-              }
-            }
+     for (const msg of replies.messages) {
+        if (msg.text && msg.text.startsWith(translationPrefix)) {
+          const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
+          if (isBotMessage) {
+            translationMessage = msg;
+            console.log(`✓ Found translation in thread: ${msg.ts}`);
+            console.log(`✓ Translation preview: ${msg.text.substring(0, 50)}...`);
+            break;
           }
+        }
+      }
+    } else if (replies.error) {
+      console.log(`⚠ Could not fetch thread replies: ${replies.error}, trying alternative method...`);
+    }
+
+    // Approach 2: If not found, search in recent channel history
+    // This works even if conversations.replies fails
+    if (!translationMessage) {
+      console.log(`Searching in recent channel history for translations...`);
+      const historyResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: messageTs,
+        limit: 200,
+      });
+
+      if (!historyResponse.error && historyResponse.messages) {
+        // Search through all messages to find ones with our translation prefix
+        // These would be replies in threads
+        for (const msg of historyResponse.messages) {
+          // Check if message is in the same thread (has matching thread_ts or is the parent)
+          const msgThreadTs = msg.thread_ts || msg.ts;
+          const isInSameThread = msgThreadTs === threadTs || msg.ts === threadTs;
           
-          if (translationMessage) {
-            console.log(`✓ Found translation using retry method`);
-            const deleteResponse = await slackApi("chat.delete", {
-              channel: channelId,
-              ts: translationMessage.ts,
-            });
-            
-            if (!deleteResponse.error) {
-              console.log(`✓✓✓ Translation deleted successfully for language: ${targetLang}`);
-              return;
+          if (isInSameThread && msg.text && msg.text.startsWith(translationPrefix)) {
+            const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
+            if (isBotMessage) {
+              translationMessage = msg;
+              console.log(`✓ Found translation in channel history: ${msg.ts}`);
+              console.log(`✓ Translation preview: ${msg.text.substring(0, 50)}...`);
+              break;
             }
           }
         }
       }
+    }
+
+    // Approach 3: If still not found, try searching all recent threads
+    if (!translationMessage) {
+      console.log(`Searching through all recent threads...`);
+      const historyResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: messageTs,
+        limit: 100,
+      });
       
-      return;
-    }
+    if (!historyResponse.error && historyResponse.messages) {
+        const recentParents = historyResponse.messages
+          .filter((msg: any) => !msg.thread_ts)
+          .slice(0, 30); 
 
-    if (!replies.messages || replies.messages.length === 0) {
-      console.log(`No messages found in thread`);
-      return;
-    }
-
-    console.log(`Found ${replies.messages.length} messages in thread, searching for translation...`);
+     for (const parent of recentParents) {
+          const parentTs = parent.ts;
+          const threadResponse = await slackApi("conversations.replies", {
+            channel: channelId,
+            ts: parentTs,
+            limit: 100,
+          });
     
-    // Find the translation message that starts with (LANG)
-    // Only delete messages posted by our bot (check bot_id or subtype)
-    const translationPrefix = `(${targetLang})`;
-    let translationMessage: any = null;
-
-    for (const msg of replies.messages) {
-      // Check if message starts with our translation prefix
-      // Also verify it's a bot message or has no user (bot messages)
-      if (msg.text && msg.text.startsWith(translationPrefix)) {
-        // Bot messages have bot_id or subtype 'bot_message', or no user field
-        // Our translations are posted by the bot, so they should have bot_id or subtype
-        const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
-        
-        if (isBotMessage) {
-          translationMessage = msg;
-          console.log(`✓ Found translation message: ${msg.ts} (bot_id: ${msg.bot_id})`);
-          console.log(`✓ Translation text preview: ${msg.text.substring(0, 50)}...`);
-          break;
-        } else {
-          console.log(`⚠ Found message with prefix but not from bot, skipping: ${msg.ts}`);
+      if (!threadResponse.error && threadResponse.messages) {
+            // Check if this thread contains our target message
+            const containsTarget = threadResponse.messages.some((msg: any) => msg.ts === messageTs);
+            
+            if (containsTarget) {
+              // Search for translation in this thread
+              for (const msg of threadResponse.messages) {
+                if (msg.text && msg.text.startsWith(translationPrefix)) {
+                  const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
+                  if (isBotMessage) {
+                    translationMessage = msg;
+                    console.log(`✓ Found translation in thread ${parentTs}: ${msg.ts}`);
+                    break;
+                  }
+                }
+              }
+              
+              if (translationMessage) break;
+            }
+          }
         }
       }
     }
 
     if (!translationMessage) {
-      console.log(`No translation found for language ${targetLang} in thread`);
-       console.log(`Searched ${replies.messages.length} messages`);
-      // Log all message texts for debugging
-      const messageTexts = replies.messages
-        .filter((m: any) => m.text)
-        .map((m: any) => m.text.substring(0, 30));
-      console.log(`Message texts in thread: ${messageTexts.join(', ')}`);
+      console.log(`✗ No translation found for language ${targetLang}`);
+      console.log(`Searched thread ${threadTs} and recent channel history`);
       return;
     }
 
