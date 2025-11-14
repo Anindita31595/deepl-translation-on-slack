@@ -94,12 +94,12 @@ async function handleReactionAdded(event: any) {
       return;
     }
 
-   // Fetch the target message using conversations.history
-    // Get recent messages and find the one with matching timestamp
+    // Fetch the target message
+    // First try conversations.history (for parent messages)
     const messageResponse = await slackApi("conversations.history", {
       channel: channelId,
       latest: messageTs,
-      limit: 100,
+      limit: 200,
     });
 
     if (messageResponse.error) {
@@ -108,36 +108,46 @@ async function handleReactionAdded(event: any) {
     }
 
     let targetMessage: any;
-    let threadTs: string;
+     let threadTs: string = messageTs; // Default to message timestamp
 
     if (messageResponse.messages && messageResponse.messages.length > 0) {
       // Find the message with the exact timestamp
       targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
       
-      if (!targetMessage) {
-          // Message not found in history - might be a thread reply
-        // Try conversations.replies - if message is a thread parent, this will work
-        console.log(`Message with timestamp ${messageTs} not found in history, trying thread search...`);
-        const threadResponse = await slackApi("conversations.replies", {
-          channel: channelId,
-          ts: messageTs,
-          limit: 100,
-        });
+       if (targetMessage) {
+        // Found in history - this is a parent message
+        threadTs = targetMessage.thread_ts || messageTs;
+        console.log(`Found message in history (parent message)`);
+      } else {
+        // Message not found in history - it might be a thread reply
+        // Search through recent messages to find thread parents, then check their threads
+        console.log(`Message with timestamp ${messageTs} not found in history, searching threads...`);
+        
+        // Get recent parent messages that might have threads
+        // Parent messages don't have thread_ts (they are the thread parent)
+        const recentParents = messageResponse.messages.filter((msg: any) => 
+          !msg.thread_ts && (msg.reply_count > 0 || msg.reply_count === undefined)
+        ).slice(0, 20); // Check up to 20 recent threads
+        
+        let found = false;
+        for (const parent of recentParents) {
+          const parentTs = parent.ts;
+          const threadResponse = await slackApi("conversations.replies", {
+            channel: channelId,
+            ts: parentTs,
+            limit: 100,
+          });
 
-        if (threadResponse.error) {
-          console.error(`Failed to fetch from thread: ${threadResponse.error}`);
-          console.log(`Searched ${messageResponse.messages.length} messages in history`);
-          return;
-        }
-
-       if (threadResponse.messages && threadResponse.messages.length > 0) {
-          // Search for the exact message in thread replies
-          targetMessage = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
-          
-          if (!targetMessage) {
-            // Still not found - might be a reply in a different thread
-            console.log(`Message not found in thread either. Searched ${threadResponse.messages.length} thread messages`);
-            return;
+        if (!threadResponse.error && threadResponse.messages) {
+            // Search for our message in this thread
+            const reply = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
+            if (reply) {
+              targetMessage = reply;
+              threadTs = reply.thread_ts || parentTs;
+              found = true;
+              console.log(`Found message in thread (parent: ${parentTs})`);
+              break;
+            }
           }
           
           // Found in thread - use thread parent as threadTs
@@ -146,45 +156,31 @@ async function handleReactionAdded(event: any) {
           console.log("No messages found in thread");
           return;
         }
-      } else {
-        // Found in history
-        threadTs = targetMessage.thread_ts || messageTs;
-      }
-    } else {
-       // No messages found in history at all - try thread search
-      console.log("No messages found in history, trying thread search...");
-      const threadResponse = await slackApi("conversations.replies", {
-        channel: channelId,
-        ts: messageTs,
-        limit: 100,
-      });
-
-      if (threadResponse.error) {
-        console.error(`Failed to fetch from thread: ${threadResponse.error}`);
-        return;
-      }
-
-   if (threadResponse.messages && threadResponse.messages.length > 0) {
-        targetMessage = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
-        
-        if (!targetMessage) {
-          console.log(`Message not found. Searched ${threadResponse.messages.length} thread messages`);
+      if (!found) {
+          console.error(`Message with timestamp ${messageTs} not found in history or recent threads`);
+          console.log(`Searched ${messageResponse.messages.length} messages in history and up to 20 threads`);
           return;
         }
-        
-        threadTs = targetMessage.thread_ts || messageTs;
-      } else {
-        console.log("No messages found");
-        return;
       }
+    } else {
+      console.error("No messages found in channel history");
+      return;
     }
 
     // Check if translation already exists
+    // Note: conversations.replies requires the thread parent timestamp
+    // If threadTs is the message itself (parent message), this will get all replies in that thread
+    // If threadTs is a parent timestamp (thread reply), this will get all replies in that thread
     const replies = await slackApi("conversations.replies", {
       channel: channelId,
       ts: threadTs,
     });
 
+      if (replies.error && replies.error !== "thread_not_found") {
+      console.error(`Error fetching thread replies: ${replies.error}`);
+      // Continue anyway - we'll just skip duplicate checking
+    }
+    
     // Prepare text for translation
     const targetText = targetMessage.text
       ?.replace(/<(.*?)>/g, (_: unknown, match: string) => {
