@@ -619,6 +619,17 @@ async function handleReactionRemoved(event: any) {
 
     if (deleteResponse.error) {
       console.error(`✗ Failed to delete translation: ${deleteResponse.error}`);
+      console.error(`✗ Delete response:`, JSON.stringify(deleteResponse, null, 2));
+      
+      // Common errors:
+      // - "missing_scope": Bot needs chat:write scope
+      // - "message_not_found": Message already deleted or doesn't exist
+      // - "cant_delete_message": Bot doesn't have permission
+      if (deleteResponse.error === "missing_scope") {
+        console.error(`✗ Bot needs 'chat:write' scope to delete messages`);
+      } else if (deleteResponse.error === "cant_delete_message") {
+        console.error(`✗ Bot doesn't have permission to delete this message`);
+      }
       return;
     }
 
