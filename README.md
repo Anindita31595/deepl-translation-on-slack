@@ -1,67 +1,43 @@
-# Message Translator (powered by DeepL API)
+## DeepL App for Slack
 
-The sample features a message translation automation. The app is added to
-designated channels by running a configurator workflow. Once added to specific
-channels, the app will translate any message there when a user adds a reaction
-to the message (ex: 🇺🇸, 🇪🇸, 🇫🇷, 🇯🇵, and more)!
+DeepL for Slack is a Slack integration that enables end-users to translate channel messages into a different lanuage just by adding reaction emoji.
 
-To learn the full list of the supported languages, head to
-[the DeepL API's document site](https://www.deepl.com/en/docs-api).
+## Features
 
-**Guide Outline**:
+### Shortcut to run DeepL Translate API
 
-- [Included Workflows](#included-workflows)
-- [Setup](#setup)
-  - [Install the Slack CLI](#install-the-slack-cli)
-  - [Clone the Template](#clone-the-template)
-  - [Create DeepL API Account](#create-deepl-api-account)
-- [Creating Triggers](#creating-triggers)
-- [Datastores](#datastores)
-- [Testing](#testing)
-- [Deploying Your App](#deploying-your-app)
-- [Viewing Activity Logs](#viewing-activity-logs)
-- [Project Structure](#project-structure)
-- [Resources](#resources)
+Slack users can run DeepL Translate API in a modal.
 
----
+<img src="https://user-images.githubusercontent.com/19658/84773721-cb505f80-b017-11ea-8c41-aed57012ab8b.gif" height="500">
 
-## Included Workflows
+### Post a translated text in thread
 
-- **Reacjilator:** Runs when a user reacts to a message in a channel where the
-  app is added. If the reaction is a supported flag emoji (ex: 🇺🇸, 🇪🇸, 🇫🇷, 🇯🇵),
-  then the app will respond in the message thread with a translated message in a
-  language corresponding to the flag a user reacted with.
+This works mostly the same as [reacjilator](https://github.com/slackapi/reacjilator).
 
-## Setup
+<img src="https://user-images.githubusercontent.com/19658/84773773-dc996c00-b017-11ea-9022-017492a7c9df.gif" height="500">
 
-Before getting started, first make sure you have a development workspace where
-you have permission to install apps. **Please note that the features in this
-project require that the workspace be part of
-[a Slack paid plan](https://slack.com/pricing).**
+## Prerequisites
 
-### Install the Slack CLI
+To run this app, the following accounts are required.
 
-To use this sample, you need to install and configure the Slack CLI.
-Step-by-step instructions can be found in our
-[Quickstart Guide](https://api.slack.com/automation/quickstart).
+* DeepL free API account
+* Slack workspace and user account
+* Render: Cloud application platform free account 
 
-### Clone the Sample
+If you already have all of them, setting up this app requires only 5 minutes.
 
-Start by cloning this repository:
-
-```zsh
-# Clone this project onto your machine
-$ slack create my-app -t slack-samples/deno-message-translator
-
-# Change into the project directory
-$ cd my-app
-```
+## Set up
 
 ### Create DeepL API Account
 
-This sample requires a valid DeepL API access token for text translation. Head
-to [the DeepL API site](https://www.deepl.com/en/docs-api) and create
-[your own API account](https://www.deepl.com/account/summary).
+* Select "for Developers" plan at https://www.deepl.com/pro/ (be careful not to choose any other)
+* Go to your [DeepL Pro Account](https://www.deepl.com/pro-account.html) page
+* Save the **Authentication Key for DeepL API** value
+
+Refer to the following resources for more details:
+
+* https://www.deepl.com/en/pro/
+* https://www.deepl.com/docs-api/
 
 **Please note that API accounts are different from DeepL's regular accounts**.
 Even when you already have an account for using the text translation on the
@@ -70,6 +46,28 @@ website, a separate account for API access needs to be created.
 Once you create your API account, copy the API token string on
 [the account summary page](https://www.deepl.com/account/summary), which is used
 for the next section.
+
+### Create your Slack App
+
+Use the [App Manifest file](https://github.com/seratch/deepl-for-slack/blob/master/app-manifest.yml) to configure a new app!
+
+<img width="400" src="https://user-images.githubusercontent.com/19658/121115984-cef47c00-c850-11eb-9d7e-dbd80407ac9a.png">
+<img width="400" src="https://user-images.githubusercontent.com/19658/121115976-cc922200-c850-11eb-8e23-1054c48b54d0.png">
+<img width="400" src="https://user-images.githubusercontent.com/19658/121115986-cf8d1280-c850-11eb-8f7f-9d59112df42b.png">
+<img width="400" src="https://user-images.githubusercontent.com/19658/121115989-d025a900-c850-11eb-9cb7-35fc979a81f8.png">
+
+* Got to **Settings > Install App** in the left pane
+  * Click **Install App to Workspace** button
+  * Click **Allow** button in the OAuth confirmation page
+  * Save the **Bot User OAuth Access Token** value (xoxb-***)
+
+* Go to **Settings > Basic Information** in the left pane
+  * Scroll down to **App Credentials** section
+  * Click **Show** button in **Signing Secret** section
+  * Save the **Signing Secret** value
+
+
+
 
 #### Development Environment Variables
 
