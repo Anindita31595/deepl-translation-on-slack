@@ -461,27 +461,33 @@ async function handleReactionRemoved(event: any) {
     let targetMessage: any = null;
     let threadTs: string = messageTs;
     
-    // Approach 1: Try conversations.replies with messageTs directly
+    // Approach 1: Try conversations.replies with messageTs directly (in case it's a thread parent)
+    console.log(`Trying conversations.replies with messageTs directly (${messageTs})...`);
     const directThreadResponse = await slackApi("conversations.replies", {
       channel: channelId,
       ts: messageTs,
       limit: 100,
     });
 
+    if (directThreadResponse.error) {
+      console.log(`conversations.replies error (expected if not thread parent): ${directThreadResponse.error}`);
+    }
     if (!directThreadResponse.error && directThreadResponse.messages) {
       const firstMsg = directThreadResponse.messages[0];
       if (firstMsg && firstMsg.ts === messageTs) {
         // messageTs is a thread parent
         targetMessage = firstMsg;
         threadTs = messageTs;
-        console.log(`✓ Found message as thread parent`);
+        console.log(`✓ Found message as thread parent via conversations.replies`);
       } else {
         // Search for our message in the thread replies
         const reply = directThreadResponse.messages.find((msg: any) => msg.ts === messageTs);
         if (reply) {
           targetMessage = reply;
+          // If found in replies, the parent is the ts we used (messageTs), or use reply.thread_ts if available
           threadTs = reply.thread_ts || messageTs;
           console.log(`✓ Found message in thread replies`);
+           console.log(`✓ Thread timestamp: ${threadTs}`);
         }
       }
     }
@@ -563,18 +569,26 @@ async function handleReactionRemoved(event: any) {
       return;
     }
 
-    // Determine the correct thread parent timestamp
+    // Ensure threadTs is correctly set (it should already be set during message search above)
     // If targetMessage has thread_ts, that's the parent. Otherwise, targetMessage.ts is the parent.
-    // Re-verify threadTs from targetMessage to ensure it's correct
+    // Only recalculate if threadTs wasn't already correctly set during the search
     
     if (targetMessage.thread_ts) {
       // Message is a reply, use its thread_ts as the parent
-      threadTs = targetMessage.thread_ts;
-      console.log(`✓ Message is a reply, using thread parent: ${threadTs}`);
+     const calculatedThreadTs = targetMessage.thread_ts;
+      if (calculatedThreadTs !== threadTs) {
+        console.log(`✓ Updating threadTs: ${threadTs} -> ${calculatedThreadTs} (from message.thread_ts)`);
+        threadTs = calculatedThreadTs;
+      }
+      console.log(`✓ Message is a reply, thread parent: ${threadTs}`);
     } else {
       // Message is a parent, use its own timestamp
-      threadTs = targetMessage.ts;
-      console.log(`✓ Message is a parent, using its timestamp: ${threadTs}`);
+     const calculatedThreadTs = targetMessage.ts;
+      if (calculatedThreadTs !== threadTs) {
+        console.log(`✓ Updating threadTs: ${threadTs} -> ${calculatedThreadTs} (message is parent)`);
+        threadTs = calculatedThreadTs;
+      }
+      console.log(`✓ Message is a parent, thread timestamp: ${threadTs}`);
     }
     // Search for translation in multiple ways
     const translationPrefix = `(${targetLang})`;
@@ -620,9 +634,15 @@ async function handleReactionRemoved(event: any) {
         // Search through all messages to find ones with our translation prefix
         // These would be replies in threads
         for (const msg of historyResponse.messages) {
-          // Check if message is in the same thread (has matching thread_ts or is the parent)
-          const msgThreadTs = msg.thread_ts || msg.ts;
-          const isInSameThread = msgThreadTs === threadTs || msg.ts === threadTs;
+         // Check if message is in the same thread
+          // A message is in the same thread if:
+          // 1. It's the thread parent (msg.ts === threadTs)
+          // 2. It's a reply in that thread (msg.thread_ts === threadTs)
+          // 3. The target message is a reply and this message has the same thread_ts
+          const isInSameThread = 
+            msg.ts === threadTs || 
+            msg.thread_ts === threadTs ||
+            (targetMessage.thread_ts && msg.thread_ts === targetMessage.thread_ts);
           
           if (isInSameThread && msg.text && msg.text.startsWith(translationPrefix)) {
             const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
@@ -643,13 +663,13 @@ async function handleReactionRemoved(event: any) {
       const historyResponse = await slackApi("conversations.history", {
         channel: channelId,
         latest: messageTs,
-        limit: 100,
+        limit: 200,
       });
       
     if (!historyResponse.error && historyResponse.messages) {
         const recentParents = historyResponse.messages
           .filter((msg: any) => !msg.thread_ts)
-          .slice(0, 30); 
+          .slice(0, 50); 
 
      for (const parent of recentParents) {
           const parentTs = parent.ts;
@@ -664,6 +684,9 @@ async function handleReactionRemoved(event: any) {
             const containsTarget = threadResponse.messages.some((msg: any) => msg.ts === messageTs);
             
             if (containsTarget) {
+              // Update threadTs to the correct parent
+              threadTs = parentTs;
+              console.log(`✓ Found target message in thread ${parentTs}, searching for translation...`);
               // Search for translation in this thread
               for (const msg of threadResponse.messages) {
                 if (msg.text && msg.text.startsWith(translationPrefix)) {
@@ -671,6 +694,7 @@ async function handleReactionRemoved(event: any) {
                   if (isBotMessage) {
                     translationMessage = msg;
                     console.log(`✓ Found translation in thread ${parentTs}: ${msg.ts}`);
+                    console.log(`✓ Translation preview: ${msg.text.substring(0, 50)}...`);
                     break;
                   }
                 }
