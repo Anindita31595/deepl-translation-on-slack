@@ -94,6 +94,8 @@ async function handleReactionAdded(event: any) {
       return;
     }
 
+    console.log(`✓ Language detected: ${reaction} -> ${lang.toUpperCase()}`);
+    
     // Fetch the target message using conversations.history
     // Get recent messages and find the one with matching timestamp
     const messageResponse = await slackApi("conversations.history", {
@@ -117,7 +119,8 @@ async function handleReactionAdded(event: any) {
         if (targetMessage) {
         // Found in history - this is a parent message
         threadTs = targetMessage.thread_ts || messageTs;
-        console.log(`Found message in history (parent message)`);
+        console.log(`✓ Found message in history (parent message)`);
+        console.log(`✓ Message text exists: ${!!targetMessage.text}`);
       } else {
         // Message not found in history - it might be a thread reply
         // Search through recent parent messages to find which thread contains our message
@@ -147,7 +150,8 @@ async function handleReactionAdded(event: any) {
               targetMessage = reply;
               threadTs = reply.thread_ts || parentTs;
               found = true;
-              console.log(`Found message in thread (parent: ${parentTs})`);
+              console.log(`✓ Found message in thread (parent: ${parentTs})`);
+              console.log(`✓ Message text exists: ${!!reply.text}`);
               break;
             }
           }
@@ -177,6 +181,13 @@ async function handleReactionAdded(event: any) {
     }
     
     // Prepare text for translation
+    if (!targetMessage.text) {
+      console.error("✗ Message has no text content to translate");
+      return;
+    }
+
+    console.log(`✓ Preparing text for translation (length: ${targetMessage.text.length})`);
+    
     const targetText = targetMessage.text
       ?.replace(/<(.*?)>/g, (_: unknown, match: string) => {
         if (match.match(/^[#@].*$/)) {
@@ -219,6 +230,8 @@ async function handleReactionAdded(event: any) {
     // Call DeepL API
     // Target language is determined by the reaction (e.g., :ru: -> RU, :jp: -> JA)
     // deeplAuthKey is guaranteed to be defined due to check at startup
+    const targetLangCode = lang.toUpperCase();
+    console.log(`✓ Calling DeepL API for translation to ${targetLangCode}`);
     const apiSubdomain = deeplAuthKey!.endsWith(":fx") ? "api-free" : "api";
     const url = `https://${apiSubdomain}.deepl.com/v2/translate`;
     const body = new URLSearchParams();
@@ -227,7 +240,7 @@ async function handleReactionAdded(event: any) {
     body.append("tag_handling", "xml");
     body.append("ignore_tags", "emoji,mrkdwn,ignore");
     // DeepL API requires uppercase language codes (e.g., "RU", "EN", "JA")
-    body.append("target_lang", lang.toUpperCase());
+    body.append("target_lang", targetLangCode);
 
     const deeplResponse = await fetch(url, {
       method: "POST",
@@ -238,7 +251,9 @@ async function handleReactionAdded(event: any) {
     });
 
     if (deeplResponse.status !== 200) {
-      console.error(`DeepL API error: ${deeplResponse.status}`);
+      const errorText = await deeplResponse.text();
+      console.error(`✗ DeepL API error: ${deeplResponse.status}`);
+      console.error(`✗ DeepL error response: ${errorText}`);
       return;
     }
 
@@ -248,9 +263,13 @@ async function handleReactionAdded(event: any) {
       !translationResult.translations ||
       translationResult.translations.length === 0
     ) {
-      console.error("No translation result");
+      console.error("✗ No translation result from DeepL");
+      console.error(`✗ Response: ${JSON.stringify(translationResult)}`);
       return;
     }
+
+    
+    console.log(`✓ Translation received from DeepL`);
 
     let translatedText = translationResult.translations[0].text
       .replace(/<emoji>([a-z0-9_-]+)<\/emoji>/g, (_: unknown, match: string) => {
@@ -278,6 +297,7 @@ async function handleReactionAdded(event: any) {
     
     // Prefix translation with language code: (LANG) translated text
     const prefixedTranslation = `(${targetLang}) ${translatedText}`;
+    console.log(`✓ Translation prepared: (${targetLang}) ${translatedText.substring(0, 50)}...`);
 
     // Check if translation for this specific language already exists
 
@@ -285,22 +305,30 @@ async function handleReactionAdded(event: any) {
       for (const msg of replies.messages) {
         // Check if message starts with the same language code prefix
         if (msg.text && msg.text.startsWith(`(${targetLang})`)) {
-          console.log(`Translation for language ${targetLang} already posted, skipping`);
+          console.log(`⚠ Translation for language ${targetLang} already posted, skipping`);
           return;
         }
       }
     }
 
     // Post translation with language code prefix
-    await slackApi("chat.postMessage", {
+   console.log(`✓ Posting translation to Slack thread ${threadTs}`);
+    const postResponse = await slackApi("chat.postMessage", {
       channel: channelId,
       text: prefixedTranslation,
       thread_ts: threadTs,
     });
 
-    console.log(`Translation posted successfully for language: ${targetLang}`);
+    if (postResponse.error) {
+      console.error(`✗ Failed to post translation: ${postResponse.error}`);
+      console.error(`✗ Post response:`, JSON.stringify(postResponse, null, 2));
+      return;
+    }
+
+    console.log(`✓✓✓ Translation posted successfully for language: ${targetLang}`);
   } catch (error) {
     console.error("Error handling reaction:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
   }
 }
 
