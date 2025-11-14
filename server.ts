@@ -502,9 +502,24 @@ async function handleReactionRemoved(event: any) {
         if (foundMsg) {
           targetMessage = foundMsg;
           // If message has thread_ts, it's a reply - use that as thread parent
-          // If no thread_ts, it's a parent message - use its own timestamp
+          // If no thread_ts, it's a parent message - use its own timestamp as thread parent
           threadTs = foundMsg.thread_ts || foundMsg.ts;
-          console.log(`✓ Found message in history, threadTs: ${threadTs}`);
+          console.log(`✓ Found message in history`);
+          console.log(`✓ Message is ${foundMsg.thread_ts ? 'a reply' : 'a parent message'}`);
+          console.log(`✓ Thread timestamp: ${threadTs}`);
+        } else {
+          // Try closest match
+          const closest = messageResponse.messages.find((msg: any) => {
+            const msgTs = parseFloat(msg.ts);
+            return Math.abs(msgTs - messageTsNum) < 1.0;
+          });
+          
+          if (closest) {
+            targetMessage = closest;
+            threadTs = closest.thread_ts || closest.ts;
+            console.log(`✓ Found message with close timestamp match`);
+            console.log(`✓ Thread timestamp: ${threadTs}`);
+          }
         }
       }
     }
@@ -550,7 +565,20 @@ async function handleReactionRemoved(event: any) {
 
     // Get all replies in the thread to find the translation
     // threadTs should now be a valid thread parent timestamp
-    console.log(`Fetching thread replies for thread ${threadTs}...`);
+     console.log(`Fetching thread replies for thread ${threadTs} (message ts: ${messageTs})...`);
+    
+    // Verify threadTs is valid - it should be the thread parent
+    // If targetMessage has thread_ts, that's the parent. Otherwise, targetMessage.ts is the parent.
+    if (targetMessage.thread_ts) {
+      // Message is a reply, use its thread_ts as the parent
+      threadTs = targetMessage.thread_ts;
+      console.log(`✓ Using thread parent from message.thread_ts: ${threadTs}`);
+    } else {
+      // Message is a parent, use its own timestamp
+      threadTs = targetMessage.ts;
+      console.log(`✓ Using message timestamp as thread parent: ${threadTs}`);
+    }
+    
     const replies = await slackApi("conversations.replies", {
       channel: channelId,
       ts: threadTs,
@@ -560,11 +588,53 @@ async function handleReactionRemoved(event: any) {
     if (replies.error) {
       // If error is "thread_not_found", it means there are no replies yet
       if (replies.error === "thread_not_found") {
-        console.log(`No thread replies found (thread might be empty)`);
+        console.log(`No thread replies found (thread might be empty or message has no replies)`);
         return;
       }
       console.error(`✗ Failed to fetch thread replies: ${replies.error}`);
       console.error(`Thread timestamp used: ${threadTs}`);
+       console.error(`Target message: ts=${targetMessage.ts}, thread_ts=${targetMessage.thread_ts || 'none'}`);
+      
+      // If we get invalid_arguments, the threadTs might not be a valid thread parent
+      // Try using the message timestamp directly if it's different
+      if (replies.error === "invalid_arguments" && threadTs !== messageTs) {
+        console.log(`Trying with message timestamp directly...`);
+        const retryReplies = await slackApi("conversations.replies", {
+          channel: channelId,
+          ts: messageTs,
+          limit: 100,
+        });
+        
+        if (!retryReplies.error && retryReplies.messages) {
+          // Use this instead
+          const translationPrefix = `(${targetLang})`;
+          let translationMessage: any = null;
+          
+          for (const msg of retryReplies.messages) {
+            if (msg.text && msg.text.startsWith(translationPrefix)) {
+              const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
+              if (isBotMessage) {
+                translationMessage = msg;
+                break;
+              }
+            }
+          }
+          
+          if (translationMessage) {
+            console.log(`✓ Found translation using retry method`);
+            const deleteResponse = await slackApi("chat.delete", {
+              channel: channelId,
+              ts: translationMessage.ts,
+            });
+            
+            if (!deleteResponse.error) {
+              console.log(`✓✓✓ Translation deleted successfully for language: ${targetLang}`);
+              return;
+            }
+          }
+        }
+      }
+      
       return;
     }
 
