@@ -565,7 +565,8 @@ async function handleReactionRemoved(event: any) {
 
     // Determine the correct thread parent timestamp
     // If targetMessage has thread_ts, that's the parent. Otherwise, targetMessage.ts is the parent.
-    let threadTs: string;
+    // Re-verify threadTs from targetMessage to ensure it's correct
+    
     if (targetMessage.thread_ts) {
       // Message is a reply, use its thread_ts as the parent
       threadTs = targetMessage.thread_ts;
