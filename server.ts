@@ -180,9 +180,12 @@ async function handleReactionAdded(event: any) {
         targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
         
         if (targetMessage) {
-          threadTs = targetMessage.thread_ts || messageTs;
+          // If message has thread_ts, it's a reply - use that as thread parent
+          // If no thread_ts, it's a parent message - use its own timestamp
+          threadTs = targetMessage.thread_ts || targetMessage.ts;
           console.log(`✓ Found message in history (parent message) with exact timestamp match`);
           console.log(`✓ Message text exists: ${!!targetMessage.text}`);
+          console.log(`✓ Thread timestamp: ${threadTs}`);
         } else {
           // Try to find closest match (within 1 second)
           console.log(`No exact match, looking for closest timestamp...`);
@@ -454,10 +457,11 @@ async function handleReactionRemoved(event: any) {
     console.log(`✓ Language detected: ${reaction} -> ${targetLang}`);
 
     // Find the message to get the thread timestamp
-    // Use the same approach as handleReactionAdded to find the message
+    // Use the same multi-approach method as handleReactionAdded
+    let targetMessage: any = null;
     let threadTs: string = messageTs;
     
-    // Try conversations.replies first (fastest if it's a thread)
+    // Approach 1: Try conversations.replies with messageTs directly
     const directThreadResponse = await slackApi("conversations.replies", {
       channel: channelId,
       ts: messageTs,
@@ -467,19 +471,23 @@ async function handleReactionRemoved(event: any) {
     if (!directThreadResponse.error && directThreadResponse.messages) {
       const firstMsg = directThreadResponse.messages[0];
       if (firstMsg && firstMsg.ts === messageTs) {
+        // messageTs is a thread parent
+        targetMessage = firstMsg;
         threadTs = messageTs;
         console.log(`✓ Found message as thread parent`);
       } else {
+        // Search for our message in the thread replies
         const reply = directThreadResponse.messages.find((msg: any) => msg.ts === messageTs);
         if (reply) {
+          targetMessage = reply;
           threadTs = reply.thread_ts || messageTs;
-          console.log(`✓ Found message in thread`);
+          console.log(`✓ Found message in thread replies`);
         }
       }
     }
 
-    // If not found in threads, try conversations.history
-    if (threadTs === messageTs) {
+    // Approach 2: If not found, try conversations.history with time range
+    if (!targetMessage) {
       const messageTsNum = parseFloat(messageTs);
       const messageResponse = await slackApi("conversations.history", {
         channel: channelId,
@@ -492,13 +500,57 @@ async function handleReactionRemoved(event: any) {
       if (!messageResponse.error && messageResponse.messages) {
         const foundMsg = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
         if (foundMsg) {
-          threadTs = foundMsg.thread_ts || messageTs;
-          console.log(`✓ Found message in history`);
+          targetMessage = foundMsg;
+          // If message has thread_ts, it's a reply - use that as thread parent
+          // If no thread_ts, it's a parent message - use its own timestamp
+          threadTs = foundMsg.thread_ts || foundMsg.ts;
+          console.log(`✓ Found message in history, threadTs: ${threadTs}`);
         }
       }
     }
 
+    // If still not found, search through recent threads
+    if (!targetMessage) {
+      const historyResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: messageTs,
+        limit: 200,
+      });
+
+      if (!historyResponse.error && historyResponse.messages) {
+        const recentParents = historyResponse.messages
+          .filter((msg: any) => !msg.thread_ts)
+          .slice(0, 50);
+        
+        for (const parent of recentParents) {
+          const parentTs = parent.ts;
+          const threadResponse = await slackApi("conversations.replies", {
+            channel: channelId,
+            ts: parentTs,
+            limit: 100,
+          });
+
+          if (!threadResponse.error && threadResponse.messages) {
+            const reply = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
+            if (reply) {
+              targetMessage = reply;
+              threadTs = reply.thread_ts || parentTs;
+              console.log(`✓ Found message in thread (parent: ${parentTs})`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!targetMessage) {
+      console.error(`✗ Message with timestamp ${messageTs} not found`);
+      return;
+    }
+
     // Get all replies in the thread to find the translation
+    // threadTs should now be a valid thread parent timestamp
+    console.log(`Fetching thread replies for thread ${threadTs}...`);
     const replies = await slackApi("conversations.replies", {
       channel: channelId,
       ts: threadTs,
@@ -506,7 +558,13 @@ async function handleReactionRemoved(event: any) {
     });
 
     if (replies.error) {
+      // If error is "thread_not_found", it means there are no replies yet
+      if (replies.error === "thread_not_found") {
+        console.log(`No thread replies found (thread might be empty)`);
+        return;
+      }
       console.error(`✗ Failed to fetch thread replies: ${replies.error}`);
+      console.error(`Thread timestamp used: ${threadTs}`);
       return;
     }
 
@@ -515,6 +573,8 @@ async function handleReactionRemoved(event: any) {
       return;
     }
 
+    console.log(`Found ${replies.messages.length} messages in thread, searching for translation...`);
+    
     // Find the translation message that starts with (LANG)
     // Only delete messages posted by our bot (check bot_id or subtype)
     const translationPrefix = `(${targetLang})`;
@@ -531,6 +591,7 @@ async function handleReactionRemoved(event: any) {
         if (isBotMessage) {
           translationMessage = msg;
           console.log(`✓ Found translation message: ${msg.ts} (bot_id: ${msg.bot_id})`);
+          console.log(`✓ Translation text preview: ${msg.text.substring(0, 50)}...`);
           break;
         } else {
           console.log(`⚠ Found message with prefix but not from bot, skipping: ${msg.ts}`);
@@ -540,6 +601,12 @@ async function handleReactionRemoved(event: any) {
 
     if (!translationMessage) {
       console.log(`No translation found for language ${targetLang} in thread`);
+       console.log(`Searched ${replies.messages.length} messages`);
+      // Log all message texts for debugging
+      const messageTexts = replies.messages
+        .filter((m: any) => m.text)
+        .map((m: any) => m.text.substring(0, 30));
+      console.log(`Message texts in thread: ${messageTexts.join(', ')}`);
       return;
     }
 
