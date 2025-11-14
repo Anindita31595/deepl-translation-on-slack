@@ -99,11 +99,11 @@ async function handleReactionAdded(event: any) {
     const messageResponse = await slackApi("conversations.history", {
       channel: channelId,
       latest: messageTs,
-      limit: 50,
+      limit: 100,
     });
 
     if (messageResponse.error) {
-      console.error(`Failed to fetch message: ${messageResponse.error}`);
+      console.error(`Failed to fetch message from history: ${messageResponse.error}`);
       return;
     }
 
@@ -115,50 +115,68 @@ async function handleReactionAdded(event: any) {
       targetMessage = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
       
       if (!targetMessage) {
-        // If exact match not found, try conversations.replies (might be in a thread)
+          // Message not found in history - might be a thread reply
+        // Try conversations.replies - if message is a thread parent, this will work
+        console.log(`Message with timestamp ${messageTs} not found in history, trying thread search...`);
         const threadResponse = await slackApi("conversations.replies", {
           channel: channelId,
           ts: messageTs,
-          limit: 1,
-          inclusive: true,
+          limit: 100,
         });
 
         if (threadResponse.error) {
-          console.error(`Failed to fetch message from thread: ${threadResponse.error}`);
+          console.error(`Failed to fetch from thread: ${threadResponse.error}`);
+          console.log(`Searched ${messageResponse.messages.length} messages in history`);
           return;
         }
 
-        if (!threadResponse.messages || threadResponse.messages.length === 0) {
-          console.log("No message found with timestamp:", messageTs);
+       if (threadResponse.messages && threadResponse.messages.length > 0) {
+          // Search for the exact message in thread replies
+          targetMessage = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
+          
+          if (!targetMessage) {
+            // Still not found - might be a reply in a different thread
+            console.log(`Message not found in thread either. Searched ${threadResponse.messages.length} thread messages`);
+            return;
+          }
+          
+          // Found in thread - use thread parent as threadTs
+          threadTs = targetMessage.thread_ts || messageTs;
+        } else {
+          console.log("No messages found in thread");
           return;
         }
-
-        targetMessage = threadResponse.messages[0];
-        threadTs = targetMessage.thread_ts || messageTs;
       } else {
+        // Found in history
         threadTs = targetMessage.thread_ts || messageTs;
       }
     } else {
-      // If not found in history, it might be in a thread, try conversations.replies
+       // No messages found in history at all - try thread search
+      console.log("No messages found in history, trying thread search...");
       const threadResponse = await slackApi("conversations.replies", {
         channel: channelId,
         ts: messageTs,
-        limit: 1,
-        inclusive: true,
+        limit: 100,
       });
 
       if (threadResponse.error) {
-        console.error(`Failed to fetch message from thread: ${threadResponse.error}`);
+        console.error(`Failed to fetch from thread: ${threadResponse.error}`);
         return;
       }
 
-    if (!threadResponse.messages || threadResponse.messages.length === 0) {
-        console.log("No message found");
+   if (threadResponse.messages && threadResponse.messages.length > 0) {
+        targetMessage = threadResponse.messages.find((msg: any) => msg.ts === messageTs);
+        
+        if (!targetMessage) {
+          console.log(`Message not found. Searched ${threadResponse.messages.length} thread messages`);
+          return;
+        }
+        
+        threadTs = targetMessage.thread_ts || messageTs;
+      } else {
+        console.log("No messages found");
         return;
       }
-
-     targetMessage = threadResponse.messages[0];
-      threadTs = targetMessage.thread_ts || messageTs;
     }
 
     // Check if translation already exists
