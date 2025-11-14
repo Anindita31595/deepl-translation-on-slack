@@ -31,7 +31,9 @@ declare const Deno: {
     get(key: string): string | undefined;
   };
   exit(code: number): never;
-  serve(options: { port: number }, handler: (req: Request) => Response | Promise<Response>): void;
+   serve(options: { port: number }, handler: (req: Request) => Response | Promise<Response>): {
+    finished: Promise<void>;
+  };
 };
 
 // Get environment variables
