@@ -422,6 +422,146 @@ async function handleReactionAdded(event: any) {
   }
 }
 
+// Handle reaction_removed event - delete the corresponding translation
+async function handleReactionRemoved(event: any) {
+  try {
+    const reaction = event.reaction;
+    const channelId = event.item?.channel;
+    const messageTs = event.item?.ts;
+
+    if (!channelId || !messageTs) {
+      console.error(`✗ Missing required event data: channelId=${channelId}, messageTs=${messageTs}`);
+      return;
+    }
+
+    console.log(`Reaction removed: ${reaction} in channel ${channelId}, message timestamp: ${messageTs}`);
+
+    // Detect language from reaction (same logic as reaction_added)
+    let lang: string | undefined = undefined;
+    if (reaction.startsWith("flag-")) {
+      const country = reaction.replace(/^flag-/, "");
+      lang = allReactionToLang[country];
+    } else {
+      lang = allReactionToLang[reaction];
+    }
+
+    if (!lang) {
+      console.log(`No language mapping found for reaction: ${reaction}`);
+      return;
+    }
+
+    const targetLang = lang.toUpperCase();
+    console.log(`✓ Language detected: ${reaction} -> ${targetLang}`);
+
+    // Find the message to get the thread timestamp
+    // Use the same approach as handleReactionAdded to find the message
+    let threadTs: string = messageTs;
+    
+    // Try conversations.replies first (fastest if it's a thread)
+    const directThreadResponse = await slackApi("conversations.replies", {
+      channel: channelId,
+      ts: messageTs,
+      limit: 100,
+    });
+
+    if (!directThreadResponse.error && directThreadResponse.messages) {
+      const firstMsg = directThreadResponse.messages[0];
+      if (firstMsg && firstMsg.ts === messageTs) {
+        threadTs = messageTs;
+        console.log(`✓ Found message as thread parent`);
+      } else {
+        const reply = directThreadResponse.messages.find((msg: any) => msg.ts === messageTs);
+        if (reply) {
+          threadTs = reply.thread_ts || messageTs;
+          console.log(`✓ Found message in thread`);
+        }
+      }
+    }
+
+    // If not found in threads, try conversations.history
+    if (threadTs === messageTs) {
+      const messageTsNum = parseFloat(messageTs);
+      const messageResponse = await slackApi("conversations.history", {
+        channel: channelId,
+        latest: (messageTsNum + 10).toString(),
+        oldest: (messageTsNum - 10).toString(),
+        inclusive: true,
+        limit: 100,
+      });
+
+      if (!messageResponse.error && messageResponse.messages) {
+        const foundMsg = messageResponse.messages.find((msg: any) => msg.ts === messageTs);
+        if (foundMsg) {
+          threadTs = foundMsg.thread_ts || messageTs;
+          console.log(`✓ Found message in history`);
+        }
+      }
+    }
+
+    // Get all replies in the thread to find the translation
+    const replies = await slackApi("conversations.replies", {
+      channel: channelId,
+      ts: threadTs,
+      limit: 100,
+    });
+
+    if (replies.error) {
+      console.error(`✗ Failed to fetch thread replies: ${replies.error}`);
+      return;
+    }
+
+    if (!replies.messages || replies.messages.length === 0) {
+      console.log(`No messages found in thread`);
+      return;
+    }
+
+    // Find the translation message that starts with (LANG)
+    // Only delete messages posted by our bot (check bot_id or subtype)
+    const translationPrefix = `(${targetLang})`;
+    let translationMessage: any = null;
+
+    for (const msg of replies.messages) {
+      // Check if message starts with our translation prefix
+      // Also verify it's a bot message or has no user (bot messages)
+      if (msg.text && msg.text.startsWith(translationPrefix)) {
+        // Bot messages have bot_id or subtype 'bot_message', or no user field
+        // Our translations are posted by the bot, so they should have bot_id or subtype
+        const isBotMessage = msg.bot_id || msg.subtype === 'bot_message' || !msg.user;
+        
+        if (isBotMessage) {
+          translationMessage = msg;
+          console.log(`✓ Found translation message: ${msg.ts} (bot_id: ${msg.bot_id})`);
+          break;
+        } else {
+          console.log(`⚠ Found message with prefix but not from bot, skipping: ${msg.ts}`);
+        }
+      }
+    }
+
+    if (!translationMessage) {
+      console.log(`No translation found for language ${targetLang} in thread`);
+      return;
+    }
+
+    // Delete the translation message
+    console.log(`✓ Deleting translation message ${translationMessage.ts}`);
+    const deleteResponse = await slackApi("chat.delete", {
+      channel: channelId,
+      ts: translationMessage.ts,
+    });
+
+    if (deleteResponse.error) {
+      console.error(`✗ Failed to delete translation: ${deleteResponse.error}`);
+      return;
+    }
+
+    console.log(`✓✓✓ Translation deleted successfully for language: ${targetLang}`);
+  } catch (error) {
+    console.error("Error handling reaction removal:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+  }
+}
+
 // HTTP request handler
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -507,8 +647,11 @@ async function handler(req: Request): Promise<Response> {
           console.log("Processing reaction_added event");
           handleReactionAdded(event).catch(console.error);
         }
+        else if (event.type === "reaction_removed") {
+          console.log("Processing reaction_removed event");
+          handleReactionRemoved(event).catch(console.error);
         else {
-          console.log("Event type not reaction_added, ignoring:", event.type);
+         console.log("Event type not handled, ignoring:", event.type);
         }
         return response;
       }
