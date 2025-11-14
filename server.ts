@@ -226,6 +226,7 @@ async function handleReactionAdded(event: any) {
       }) || "";
 
     // Call DeepL API
+    // Target language is determined by the reaction (e.g., :ru: -> RU, :jp: -> JA)
     // deeplAuthKey is guaranteed to be defined due to check at startup
     const apiSubdomain = deeplAuthKey!.endsWith(":fx") ? "api-free" : "api";
     const url = `https://${apiSubdomain}.deepl.com/v2/translate`;
@@ -234,6 +235,7 @@ async function handleReactionAdded(event: any) {
     body.append("text", targetText);
     body.append("tag_handling", "xml");
     body.append("ignore_tags", "emoji,mrkdwn,ignore");
+    // DeepL API requires uppercase language codes (e.g., "RU", "EN", "JA")
     body.append("target_lang", lang.toUpperCase());
 
     const deeplResponse = await fetch(url, {
@@ -280,24 +282,32 @@ async function handleReactionAdded(event: any) {
         return match;
       });
 
-    // Check if already posted
+   // Get uppercase language code for prefix
+    const targetLang = lang.toUpperCase();
+    
+    // Prefix translation with language code: (LANG) translated text
+    const prefixedTranslation = `(${targetLang}) ${translatedText}`;
+
+    // Check if translation for this specific language already exists
+
     if (replies.messages) {
       for (const msg of replies.messages) {
-        if (msg.text === translatedText) {
-          console.log("Translation already posted, skipping");
+        // Check if message starts with the same language code prefix
+        if (msg.text && msg.text.startsWith(`(${targetLang})`)) {
+          console.log(`Translation for language ${targetLang} already posted, skipping`);
           return;
         }
       }
     }
 
-    // Post translation
+    // Post translation with language code prefix
     await slackApi("chat.postMessage", {
       channel: channelId,
-      text: translatedText,
+      text: prefixedTranslation,
       thread_ts: threadTs,
     });
 
-    console.log(`Translation posted successfully for language: ${lang}`);
+    console.log(`Translation posted successfully for language: ${targetLang}`);
   } catch (error) {
     console.error("Error handling reaction:", error);
   }
