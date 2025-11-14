@@ -1,19 +1,17 @@
-# Use the official Deno image
 FROM denoland/deno:latest
 
-# Set working directory
 WORKDIR /app
 
-# Copy all application files
+# Copy all files to ensure context is correct
 COPY . .
 
 # Cache dependencies
 RUN deno cache server.ts
 
-# Expose port (Render will provide PORT via env var, default to 10000)
+# Expose port (Render sets PORT automatically)
 EXPOSE 10000
 
-# Run the server
-# Render sets PORT automatically, but we need to read it from env
+# Run the server- Render sets PORT env var automatically
+# Using exec form for better signal handling
 CMD ["deno", "run", "--allow-net", "--allow-env", "server.ts"]
 
