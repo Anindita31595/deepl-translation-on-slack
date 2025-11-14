@@ -5,9 +5,6 @@ WORKDIR /app
 # Copy all files to ensure context is correct
 COPY . .
 
-# Cache dependencies
-RUN deno cache server.ts
-
 # Expose port (Render sets PORT automatically)
 EXPOSE 10000
 
