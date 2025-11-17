@@ -168,6 +168,8 @@ After deploying, configure your Slack app:
 6. Under **Subscribe to bot events**, add: `reaction_added`
 7. Save changes
 
+<img height="500" alt="slack_app_creation_S6" src="https://github.com/user-attachments/assets/c45672e4-e3b1-4471-9d4f-6bcf0e732973" />
+
 ## Project Structure
 
 ### `server.ts`
