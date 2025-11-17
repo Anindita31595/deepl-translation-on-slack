@@ -101,7 +101,7 @@ Key	Value
 - `DEEPL_AUTH_KEY` (from your DeepL free API account)
 - `SLACK_CLIENT_SECRET`	(from your Slack app → Basic Information)
 - `SLACK_BOT_TOKEN` (from your Slack app → OAuth & Permissions)
-- `PORT` - Automatically set by hosting platform
+- `PORT` Automatically set by hosting platform
 
 Click Save Changes.
 
