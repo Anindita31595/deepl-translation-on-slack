@@ -30,13 +30,12 @@ If you already have all of them, setting up this app requires only 5 minutes.
 
 ### Create DeepL API Account
 
-* Select "for Developers" plan at https://www.deepl.com/pro/ (be careful not to choose any other)
-* Go to your [DeepL Pro Account](https://www.deepl.com/pro-account.html) page
+* Select "DeepL API Free" plan at https://www.deepl.com/ja/pro-api? page to create DeepL API account.
+* * Go to your [DeepL Pro Account](https://www.deepl.com/pro-account.html) page
 * Save the **Authentication Key for DeepL API** value
 
 Refer to the following resources for more details:
 
-* https://www.deepl.com/en/pro/
 * https://www.deepl.com/docs-api/
 
 **Please note that API accounts are different from DeepL's regular accounts**.
@@ -49,94 +48,89 @@ for the next section.
 
 ### Create your Slack App
 
-Use the [App Manifest file](https://github.com/seratch/deepl-for-slack/blob/master/app-manifest.yml) to configure a new app!
+Go to https://api.slack.com/apps/ to create your slack app
 
-<img width="400" src="https://user-images.githubusercontent.com/19658/121115984-cef47c00-c850-11eb-9d7e-dbd80407ac9a.png">
-<img width="400" src="https://user-images.githubusercontent.com/19658/121115976-cc922200-c850-11eb-8e23-1054c48b54d0.png">
-<img width="400" src="https://user-images.githubusercontent.com/19658/121115986-cf8d1280-c850-11eb-8f7f-9d59112df42b.png">
-<img width="400" src="https://user-images.githubusercontent.com/19658/121115989-d025a900-c850-11eb-9cb7-35fc979a81f8.png">
+<img width="518" height="163" alt="slack_app_creation" src="https://github.com/user-attachments/assets/292935fc-fc00-4d7a-83e9-27b511317d11" />
 
-* Got to **Settings > Install App** in the left pane
-  * Click **Install App to Workspace** button
-  * Click **Allow** button in the OAuth confirmation page
-  * Save the **Bot User OAuth Access Token** value (xoxb-***)
-
+  * Click **Create New App** button
+  * Click **From Scratch** button
+    <img width="261" height="177" alt="slack_app_creation_S1" src="https://github.com/user-attachments/assets/c51e642f-370a-4807-8acf-73bf7bf23052" /> 
+  * Write a name for your App and select a workspace to develop your app
+  * Click on **Create App* button
+    <img width="258" height="250" alt="slack_app_creation_S2" src="https://github.com/user-attachments/assets/ed03443e-6f82-4fa1-95ba-18b14323086d" />
+ 
+* Click on the App Name (DeepL Translation)
 * Go to **Settings > Basic Information** in the left pane
   * Scroll down to **App Credentials** section
   * Click **Show** button in **Signing Secret** section
   * Save the **Signing Secret** value
+    
+** Got to **Settings > Install App** in the left pane
+  * Click **Install App to Workspace** button
+  * Click **Allow** button in the OAuth confirmation page
+  * Save the **Bot User OAuth Access Token** value (xoxb-***)
 
+### Deploy to Render
 
+* Go to 👉 https://render.com
 
+Click “New +” → “Web Service”
 
-#### Development Environment Variables
+Connect your GitHub account (if not already)
 
-When [developing locally](https://api.slack.com/automation/run), environment
-variables found in the `.env` file at the root of your project are used. For
-local development, rename `.env.sample` to `.env` and add your access token to
-the file contents (replacing `ACCESS_TOKEN` with your token):
+Select your github repository (deepl-translation-on-slack)
 
-```bash
-# .env
-DEEPL_AUTH_KEY=ACCESS_TOKEN
-```
+**Configure:**
 
-#### Production Environment Variables
+Name: deepl-translation-on-slack
 
-[Deployed apps](https://api.slack.com/automation/deploy) use environment
-variables that are added using `slack env`. To add your access token to a
-Workspace where your deployed app is installed, use the following command (once
-again, replacing `ACCESS_TOKEN` with your token):
+Region: any/Singapore (fastest for Japan)
 
-```zsh
-$ slack env add DEEPL_AUTH_KEY YOUR_ACCESS_TOKEN
-```
+Branch: main
 
-## Running Your Project Locally
+Language: Docker
 
-To test the app locally before deploying:
+Dockerfile path: ./Dockerfile
 
-1. Create a `.env` file with your environment variables:
-   ```
-   DEEPL_AUTH_KEY=your_key_here
-   SLACK_BOT_TOKEN=xoxb-your-token
-   SLACK_SIGNING_SECRET=your_secret
-   PORT=3000
-   ```
+Click “Create Web Service”
 
-2. Run the server:
-   ```zsh
-   deno run --allow-net --allow-env server.ts
-   ```
+**Add Environment Variables**
 
-3. Use a tool like [ngrok](https://ngrok.com/) to expose your local server:
-   ```zsh
-   ngrok http 3000
-   ```
+Once it deploys, click “Environment” in Render’s left panel.
+Add these variables:
 
-4. Set the ngrok URL as your Slack app's Request URL (temporarily for testing)
+Key	Value
+- DEEPL_AUTH_KEY(from your DeepL free API account)
+- SLACK_CLIENT_SECRET	(from your Slack app → Basic Information)
+- SLACK_BOT_TOKEN (from your Slack app → OAuth & Permissions)
+- `PORT` - Automatically set by hosting platform
 
-To stop the server, press `<CTRL> + C`.
+Click Save Changes.
 
-## Usage
+For detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).\
 
-Once the app is deployed and configured:
+**Copy Your Render URL**
 
-1. **Add the bot to your Slack channels** where you want translations
-2. **Add a flag reaction** (🇯🇵, 🇫🇷, 🇪🇸, etc.) or country code reaction (`:jp:`, `:fr:`, `:es:`, etc.) to any message
-3. The app will automatically translate the message and post it as a thread reply
+After deployment, you’ll get a live URL, something like:
+https://deepl-slack-app.onrender.com
 
-**Supported Reactions:**
-- Flag emojis: `:flag-jp:`, `:flag-fr:`, `:flag-es:`, etc.
-- Country codes: `:jp:`, `:fr:`, `:es:`, `:de:`, etc.
+Then, in your Slack App Dashboard → OAuth & Permissions,
+add this to Redirect URLs:
+https://deepl-slack-app.onrender.com/slack/oauth_redirect
 
-The app supports 100+ languages. See `functions/detect_lang.ts` for the complete list.
+Save the changes.
 
-<img width="600" src="https://user-images.githubusercontent.com/19658/206638194-6eff88fa-05c1-4308-a180-0a547890aab6.png">
+**Reinstall App in Slack**
+
+Go back to your Slack app page → OAuth & Permissions
+
+Click Reinstall to Workspace
+
+Authorize it again — Slack will now talk to your Render server.
 
 ## Configuration
 
-### Slack App Setup
+### Slack App Setup 
 
 After deploying, configure your Slack app:
 
@@ -144,51 +138,9 @@ After deploying, configure your Slack app:
 2. Select your app
 3. Go to **Event Subscriptions**
 4. Enable Event Subscriptions
-5. Set **Request URL** to: `https://your-app-url.com/slack/events`
+5. Set **Request URL** to: `https://your-app.onrender.com/slack/events`
 6. Under **Subscribe to bot events**, add: `reaction_added`
 7. Save changes
-
-### Environment Variables
-
-Required environment variables:
-- `DEEPL_AUTH_KEY` - Your DeepL API key
-- `SLACK_BOT_TOKEN` - Your Slack bot token (starts with `xoxb-`)
-- `SLACK_SIGNING_SECRET` - Your Slack app's signing secret
-- `PORT` - Automatically set by hosting platform
-
-## Deploying Your App
-
-This app is configured for Docker deployment to external hosting platforms. The app uses webhooks to handle Slack Events API requests.
-
-**Supported Platforms:**
-- **Render** (Free tier available) - Recommended, see setup below
-- **Railway** - See [DEPLOYMENT.md](./DEPLOYMENT.md) for setup
-- **Fly.io** - See [DEPLOYMENT.md](./DEPLOYMENT.md) for setup
-- **Deno Deploy** - See [DEPLOYMENT.md](./DEPLOYMENT.md) for setup
-
-**Quick Start for Render (Recommended):**
-1. Push your code to GitHub
-2. Connect your repository to Render
-3. Select **Docker** as the runtime
-4. Set Dockerfile path to `./Dockerfile`
-5. Add environment variables:
-   - `DEEPL_AUTH_KEY` - Your DeepL API key
-   - `SLACK_BOT_TOKEN` - Your Slack bot token (starts with `xoxb-`)
-   - `SLACK_SIGNING_SECRET` - Your Slack signing secret
-6. Configure your Slack app's Event Subscriptions:
-   - Request URL: `https://your-app.onrender.com/slack/events`
-   - Subscribe to `reaction_added` event
-
-For detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
-
-## Viewing Activity Logs
-
-Activity logs of your application can be viewed live and as they occur with the
-following command:
-
-```zsh
-$ slack activity --tail
-```
 
 ## Project Structure
 
