@@ -50,15 +50,17 @@ for the next section.
 
 Go to https://api.slack.com/apps/ to create your slack app
 
-<img width="518" height="163" alt="slack_app_creation" src="https://github.com/user-attachments/assets/292935fc-fc00-4d7a-83e9-27b511317d11" />
+<img height="500"" alt="slack_app_creation" src="https://github.com/user-attachments/assets/292935fc-fc00-4d7a-83e9-27b511317d11" />
 
   * Click **Create New App** button
   * Click **From Scratch** button
-    <img width="261" height="177" alt="slack_app_creation_S1" src="https://github.com/user-attachments/assets/c51e642f-370a-4807-8acf-73bf7bf23052" />
+    
+    <img height="500" alt="slack_app_creation_S1" src="https://github.com/user-attachments/assets/c51e642f-370a-4807-8acf-73bf7bf23052" />
     
   * Write a name for your App and select a workspace to develop your app
   * Click on **Create App* button
-    <img width="258" height="250" alt="slack_app_creation_S2" src="https://github.com/user-attachments/assets/ed03443e-6f82-4fa1-95ba-18b14323086d" />
+    
+    <img height="500" alt="slack_app_creation_S2" src="https://github.com/user-attachments/assets/ed03443e-6f82-4fa1-95ba-18b14323086d" />
  
 * Click on the App Name (DeepL Translation)
 * Go to **Settings > Basic Information** in the left pane
