@@ -749,35 +749,25 @@ async function handler(req: Request): Promise<Response> {
   console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
   
 // Health check endpoint for UptimeRobot and other monitoring services
-   // Supports both plain text and JSON responses
+// Always returns simple "OK" response for maximum compatibility
   if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
-    const acceptHeader = req.headers.get("accept") || "";
-    const wantsJson = acceptHeader.includes("application/json");
+    const userAgent = req.headers.get("user-agent") || "unknown";
+    const timestamp = new Date().toISOString();
     
-    console.log(`Health check (${url.pathname}) - returning OK`);
+    console.log(`✓ Health check (${url.pathname}) - User-Agent: ${userAgent.substring(0, 50)}`);
+    console.log(`✓ Health check - returning OK at ${timestamp}`);
     
-    if (wantsJson) {
-      return new Response(JSON.stringify({ 
-        status: "ok", 
-        service: "slack-message-translator",
-        timestamp: new Date().toISOString()
-      }), { 
-        status: 200,
-        headers: { 
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache"
-        }
-      });
-    } else {
-      // Plain text response for UptimeRobot and simple monitors
-      return new Response("OK", { 
-        status: 200,
-        headers: { 
-          "Content-Type": "text/plain",
-          "Cache-Control": "no-cache"
-        }
-      });
-    }
+   // Always return simple "OK" text for UptimeRobot compatibility
+    // UptimeRobot expects HTTP 200 with any response body
+    return new Response("OK", { 
+      status: 200,
+      headers: { 
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    });
   }
 
   // Slack Events API endpoint
