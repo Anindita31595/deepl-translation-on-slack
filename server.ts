@@ -1,4 +1,20 @@
 // Note: This file uses Deno APIs and will work correctly when run with Deno (via Docker on Render).
+Deno.serve((req) => {
+  const url = new URL(req.url);
+
+  // UptimeRobot ping
+  if (url.pathname === "/") {
+    return new Response("OK", { status: 200 });
+  }
+
+  // Slack events
+  if (url.pathname === "/slack/events" && req.method === "POST") {
+    // your Slack handling code
+    return handleSlackEvent(req);
+  }
+
+  return new Response("Not Found", { status: 404 });
+});
 
 // Language mapping from reaction names to DeepL language codes
 const allReactionToLang: Record<string, string> = {
