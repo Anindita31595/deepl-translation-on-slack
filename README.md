@@ -130,6 +130,8 @@ Key	Value
 - `SLACK_CLIENT_SECRET`	(from your Slack app → Basic Information)
 - `SLACK_BOT_TOKEN` (from your Slack app → OAuth & Permissions)
 - `PORT` Automatically set by hosting platform
+- 
+<img height="500" alt="Render_Setup1" src="https://github.com/user-attachments/assets/0339f905-ab3b-496d-acd6-dbea430b6a92" />
 
 Click Save Changes.
 
