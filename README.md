@@ -70,7 +70,31 @@ Go to https://api.slack.com/apps/ to create your slack app
   * Scroll down to **App Credentials** section
   * Click **Show** button in **Signing Secret** section
   * Save the **Signing Secret** value
+
+*Once the app is created, go to **Features > OAuth & Permissions** from the left pane, then **Scopes > Bot Token Scopes** and add the following:
+  * channels:history- Used to view messages with reactions and to view the history to avoid duplicate posts in a thread
+  * groups:history- Same as above (not necessary if not using a private channel
+  * channels:join- Used to join public channels in a workspace
+  * chat:write- Used to write translation results to a channel
+  * im:history-  Used to view messages and other contents in direct messages that the App has been added to
+  * mpim:history-  Used to view messages and other contents in group direct messages that the App has been added to
+  * reactions:read- Used to subscribe to events with reactions
+  * reactions:write- Used to add and edit reactions
     
+ <img src="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2F20e05acc-8820-5fde-9900-364aef7fd354.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;s=cb1caae3497292f6f9b75734aa5f40e1" width="600" srcset="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2F20e05acc-8820-5fde-9900-364aef7fd354.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;w=1400&amp;fit=max&amp;s=95f9435f46fc23659626f680face1a30 1x" data-canonical-src="https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/19163/20e05acc-8820-5fde-9900-364aef7fd354.gif" loading="lazy">
+
+If you've set it up correctly, it should look like this:
+
+<img height="500" alt="slack_app_creation_S4" src="https://github.com/user-attachments/assets/b49de160-ad26-4394-9117-74838ece25e8" />
+
+**Bot configuration**
+Set the name of your bot. 
+Go to **Features > App Home** from the left pane. Click the Edit button next to App Display Name and set it.
+
+
+The name can be anything, but it might be a good idea to give it an easy-to-remember name like "Translation-kun."
+
+
 * Go to **Settings > Install App** in the left pane
   * Click **Install App to Workspace** button
   * Click **Allow** button in the OAuth confirmation page
