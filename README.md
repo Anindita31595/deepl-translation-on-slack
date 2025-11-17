@@ -101,6 +101,8 @@ The name can be anything, but it might be a good idea to give it an easy-to-reme
   * Click **Install App to Workspace** button
   * Click **Allow** button in the OAuth confirmation page
   * Save the **Bot User OAuth Access Token** value (xoxb-***)
+  * 
+<img width="600" src="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2F332dfc4b-4bcf-c7e0-3863-a909b6c75e9e.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;s=a1bd8c51939f27524f4d274faf40e6f4" srcset="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2F332dfc4b-4bcf-c7e0-3863-a909b6c75e9e.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;w=1400&amp;fit=max&amp;s=747d4d9aec4e16365f9c28eab3faf0bd 1x" data-canonical-src="https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/19163/332dfc4b-4bcf-c7e0-3863-a909b6c75e9e.gif" loading="lazy">
 
 ### Deploy to Render
 
