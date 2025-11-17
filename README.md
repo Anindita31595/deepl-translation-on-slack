@@ -140,11 +140,11 @@ For detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).\
 **Copy Your Render URL**
 
 After deployment, you’ll get a live URL, something like:
-[https://deepl-translation-on-slack.onrender.com]
+`https://your-app.onrender.com`
 
 Then, in your Slack App Dashboard → OAuth & Permissions,
 add this to Redirect URLs:
-[https://deepl-translation-on-slack.onrender.com/slack/oauth_redirect]
+`https://your-app.onrender.com/slack/oauth_redirect`
 
 Save the changes.
 
