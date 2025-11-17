@@ -1,21 +1,4 @@
 // Note: This file uses Deno APIs and will work correctly when run with Deno (via Docker on Render).
-Deno.serve((req) => {
-  const url = new URL(req.url);
-
-  // UptimeRobot ping
-  if (url.pathname === "/") {
-    return new Response("OK", { status: 200 });
-  }
-
-  // Slack events
-  if (url.pathname === "/slack/events" && req.method === "POST") {
-    // your Slack handling code
-    return handleSlackEvent(req);
-  }
-
-  return new Response("Not Found", { status: 404 });
-});
-
 // Language mapping from reaction names to DeepL language codes
 const allReactionToLang: Record<string, string> = {
   ac: "en", ag: "en", ai: "en", ao: "pt", ar: "es", as: "en", at: "de", au: "en",
@@ -765,10 +748,30 @@ async function handler(req: Request): Promise<Response> {
 // Log all incoming requests for debugging
   console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
   
-// Health check
+// Health check endpoint for UptimeRobot and other monitoring services
   if (req.method === "GET" && url.pathname === "/") {
     console.log("Health check - returning OK");
-    return new Response("OK", { status: 200 });
+    return new Response(JSON.stringify({ 
+      status: "ok", 
+      service: "slack-message-translator",
+      timestamp: new Date().toISOString()
+    }), { 
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  
+  // Alternative health check endpoint
+  if (req.method === "GET" && url.pathname === "/health") {
+    console.log("Health check (/health) - returning OK");
+    return new Response(JSON.stringify({ 
+      status: "ok", 
+      service: "slack-message-translator",
+      timestamp: new Date().toISOString()
+    }), { 
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 
   // Slack Events API endpoint
