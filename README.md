@@ -85,7 +85,7 @@ Go to https://api.slack.com/apps/ to create your slack app
 
 If you've set it up correctly, it should look like this:
 
-<img height="500" alt="slack_app_creation_S4" src="https://github.com/user-attachments/assets/b49de160-ad26-4394-9117-74838ece25e8" />
+<img width="300" height="500" alt="slack_app_creation_S4" src="https://github.com/user-attachments/assets/b49de160-ad26-4394-9117-74838ece25e8" />
 
 **Bot configuration**
 Set the name of your bot. 
