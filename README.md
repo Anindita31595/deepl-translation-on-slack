@@ -71,7 +71,7 @@ Go to https://api.slack.com/apps/ to create your slack app
   * Click **Show** button in **Signing Secret** section
   * Save the **Signing Secret** value
     
-** Got to **Settings > Install App** in the left pane
+* Go to **Settings > Install App** in the left pane
   * Click **Install App to Workspace** button
   * Click **Allow** button in the OAuth confirmation page
   * Save the **Bot User OAuth Access Token** value (xoxb-***)
@@ -79,36 +79,28 @@ Go to https://api.slack.com/apps/ to create your slack app
 ### Deploy to Render
 
 * Go to 👉 https://render.com
-
-Click “New +” → “Web Service”
-
-Connect your GitHub account (if not already)
-
-Select your github repository (deepl-translation-on-slack)
+  * Click “New +” → “Web Service”
+  * Connect your GitHub account (if not already)
+  * Select your github repository (deepl-translation-on-slack)
 
 **Configure:**
 
-Name: deepl-translation-on-slack
-
-Region: any/Singapore (fastest for Japan)
-
-Branch: main
-
-Language: Docker
-
-Dockerfile path: ./Dockerfile
-
+ - Name: deepl-translation-on-slack
+ - Region: any/Singapore (fastest for Japan)
+ - Branch: main
+ - Language: Docker
+ - Dockerfile path: ./Dockerfile
+   
 Click “Create Web Service”
 
 **Add Environment Variables**
 
 Once it deploys, click “Environment” in Render’s left panel.
 Add these variables:
-
 Key	Value
-- DEEPL_AUTH_KEY(from your DeepL free API account)
-- SLACK_CLIENT_SECRET	(from your Slack app → Basic Information)
-- SLACK_BOT_TOKEN (from your Slack app → OAuth & Permissions)
+- `DEEPL_AUTH_KEY` (from your DeepL free API account)
+- `SLACK_CLIENT_SECRET`	(from your Slack app → Basic Information)
+- `SLACK_BOT_TOKEN` (from your Slack app → OAuth & Permissions)
 - `PORT` - Automatically set by hosting platform
 
 Click Save Changes.
