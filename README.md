@@ -85,15 +85,17 @@ Go to https://api.slack.com/apps/ to create your slack app
 
 If you've set it up correctly, it should look like this:
 
-<img width="1000" height="500" alt="slack_app_creation_S4" src="https://github.com/user-attachments/assets/b49de160-ad26-4394-9117-74838ece25e8" />
+<img width="1000" height="1000" alt="slack_app_creation_S4" src="https://github.com/user-attachments/assets/b49de160-ad26-4394-9117-74838ece25e8" />
 
 **Bot configuration**
 Set the name of your bot. 
 Go to **Features > App Home** from the left pane. Click the Edit button next to App Display Name and set it.
 
+<img src="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2Fe3acabb9-e505-cdcd-29bd-d696ff03f330.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;s=f4a67f3142f85b104daa66e4ab5df2ff" width="600" srcset="https://qiita-user-contents.imgix.net/https%3A%2F%2Fqiita-image-store.s3.ap-northeast-1.amazonaws.com%2F0%2F19163%2Fe3acabb9-e505-cdcd-29bd-d696ff03f330.gif?ixlib=rb-4.0.0&amp;auto=format&amp;gif-q=60&amp;q=75&amp;w=1400&amp;fit=max&amp;s=248ab5378540d849c5b4120e532d5f79 1x" data-canonical-src="https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/19163/e3acabb9-e505-cdcd-29bd-d696ff03f330.gif" loading="lazy">
 
-The name can be anything, but it might be a good idea to give it an easy-to-remember name like "Translation-kun."
+The name can be anything, but it might be a good idea to give it an easy-to-remember name.
 
+<img height="500" alt="slack_app_creation_S5" src="https://github.com/user-attachments/assets/fc673a8a-687f-4886-8823-787e0e1d6dc7" />
 
 * Go to **Settings > Install App** in the left pane
   * Click **Install App to Workspace** button
