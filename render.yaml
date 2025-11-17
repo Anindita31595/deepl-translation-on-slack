@@ -19,3 +19,16 @@ services:
       # PORT is automatically set by Render, don't override it
     plan: free
 
+  - type: worker
+    name: deepl-for-slack-keepalive
+    env: docker
+    region: Singapore (Southeast Asia)
+    branch: master
+    dockerfilePath: ./Dockerfile
+    dockerCommand: deno run --allow-net --allow-env keep-alive-worker.ts
+    envVars:
+      - key: WEB_SERVICE_URL
+        # Replace 'deepl-for-slack' with your actual web service name if different
+        # Format: https://your-service-name.onrender.com
+        value: https://deepl-for-slack.onrender.com
+    plan: free
