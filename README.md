@@ -1,4 +1,4 @@
-## DeepL App for Slack
+## DeepL Translation APP for Slack
 
 DeepL for Slack is a Slack integration that enables end-users to translate channel messages into a different lanuage just by adding reaction emoji.
 
