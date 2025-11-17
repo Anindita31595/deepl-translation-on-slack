@@ -131,7 +131,7 @@ Key	Value
 - `SLACK_BOT_TOKEN` (from your Slack app → OAuth & Permissions)
 - `PORT` Automatically set by hosting platform
 - 
-<img height="500" alt="Render_Setup1" src="https://github.com/user-attachments/assets/0339f905-ab3b-496d-acd6-dbea430b6a92" />
+<img height="800" alt="Render_Setup1" src="https://github.com/user-attachments/assets/0339f905-ab3b-496d-acd6-dbea430b6a92" />
 
 Click Save Changes.
 
@@ -148,11 +148,14 @@ https://deepl-slack-app.onrender.com/slack/oauth_redirect
 
 Save the changes.
 
+<img height="500" alt="slack_app_creation_S8" src="https://github.com/user-attachments/assets/8c73e0c6-8795-410a-92b0-ebdf066d3027" />
+
 **Reinstall App in Slack**
 
 Go back to your Slack app page → OAuth & Permissions
-
 Click Reinstall to Workspace
+
+<img height="500" alt="slack_app_creation_S7" src="https://github.com/user-attachments/assets/8823b04f-39d5-4781-ac64-3a79319f167d" />
 
 Authorize it again — Slack will now talk to your Render server.
 
