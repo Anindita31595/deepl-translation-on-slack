@@ -749,29 +749,35 @@ async function handler(req: Request): Promise<Response> {
   console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}`);
   
 // Health check endpoint for UptimeRobot and other monitoring services
-  if (req.method === "GET" && url.pathname === "/") {
-    console.log("Health check - returning OK");
-    return new Response(JSON.stringify({ 
-      status: "ok", 
-      service: "slack-message-translator",
-      timestamp: new Date().toISOString()
-    }), { 
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-  
-  // Alternative health check endpoint
-  if (req.method === "GET" && url.pathname === "/health") {
-    console.log("Health check (/health) - returning OK");
-    return new Response(JSON.stringify({ 
-      status: "ok", 
-      service: "slack-message-translator",
-      timestamp: new Date().toISOString()
-    }), { 
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
+   // Supports both plain text and JSON responses
+  if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
+    const acceptHeader = req.headers.get("accept") || "";
+    const wantsJson = acceptHeader.includes("application/json");
+    
+    console.log(`Health check (${url.pathname}) - returning OK`);
+    
+    if (wantsJson) {
+      return new Response(JSON.stringify({ 
+        status: "ok", 
+        service: "slack-message-translator",
+        timestamp: new Date().toISOString()
+      }), { 
+        status: 200,
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache"
+        }
+      });
+    } else {
+      // Plain text response for UptimeRobot and simple monitors
+      return new Response("OK", { 
+        status: 200,
+        headers: { 
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-cache"
+        }
+      });
+    }
   }
 
   // Slack Events API endpoint
