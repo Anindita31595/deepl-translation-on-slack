@@ -63,6 +63,9 @@ Go to https://api.slack.com/apps/ to create your slack app
     <img height="500" alt="slack_app_creation_S2" src="https://github.com/user-attachments/assets/ed03443e-6f82-4fa1-95ba-18b14323086d" />
  
 * Click on the App Name (DeepL Translation)
+
+  <img height="500" alt="slack_app_creation_S3" src="https://github.com/user-attachments/assets/dc43e386-5425-4d45-945e-58ba23548ef6" />
+  
 * Go to **Settings > Basic Information** in the left pane
   * Scroll down to **App Credentials** section
   * Click **Show** button in **Signing Secret** section
