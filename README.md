@@ -31,7 +31,7 @@ If you already have all of them, setting up this app requires only 5 minutes.
 ### Create DeepL API Account
 
 * Select "DeepL API Free" plan at https://www.deepl.com/ja/pro-api? page to create DeepL API account.
-* * Go to your [DeepL Pro Account](https://www.deepl.com/pro-account.html) page
+* Go to your [DeepL Pro Account](https://www.deepl.com/pro-account.html) page
 * Save the **Authentication Key for DeepL API** value
 
 Refer to the following resources for more details:
