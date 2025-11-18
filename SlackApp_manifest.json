@@ -1,0 +1,42 @@
+{
+    "display_information": {
+        "name": "DeepL Translation",
+        "description": "Translates Slack messages when a user reacts with a country flag.",
+        "background_color": "#737373"
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "DeepL Translation",
+            "always_online": true
+        }
+    },
+    "oauth_config": {
+        "redirect_urls": [
+            "https://deepl-translation-on-slack.onrender.com/slack/oauth_redirect"
+        ],
+        "scopes": {
+            "bot": [
+                "channels:history",
+                "chat:write",
+                "groups:history",
+                "reactions:read",
+                "channels:join",
+                "im:history",
+                "mpim:history",
+                "reactions:write"
+            ]
+        }
+    },
+    "settings": {
+        "event_subscriptions": {
+            "request_url": "https://deepl-translation-on-slack.onrender.com/slack/events",
+            "bot_events": [
+                "reaction_added",
+                "reaction_removed"
+            ]
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": false,
+        "token_rotation_enabled": false
+    }
+}
