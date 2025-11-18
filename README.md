@@ -178,6 +178,37 @@ After deploying, configure your Slack app:
 
 <img height="500" alt="slack_app_creation_S6" src="https://github.com/user-attachments/assets/c45672e4-e3b1-4471-9d4f-6bcf0e732973" />
 
+## Guide to keep your Slack–DeepL bot always awake on Render Free Plan using UptimeRobot
+
+Step 1 — Go to https://uptimerobot.com (Free plan is enough.)
+
+- Sign up → Log in.
+
+Step 2 — Create a New Monitor
+
+Click “+ New”
+
+Choose:
+
+Monitor Type: HTTP(s)
+
+Friendly Name: Render DeepL Bot
+
+URL to Monitor: Your Render app URL https://your-app.onrender.com.onrender.com/
+
+Monitoring Interval:
+→ select Every 5 minutes (free plan default)
+
+Click Create Monitor
+
+<img height="500" alt="UptimeRobotMonitoring" src="https://github.com/user-attachments/assets/a514d487-729b-41f3-9cdb-b03821a0e913" />
+
+### Benefits of implementing UptimeRobot
+
+- UptimeRobot will now send a GET request every 5 minutes.
+
+- This keeps your Render service active so it does not sleep which helps to prevent translation delays
+
 ## Project Structure
 
 ### `server.ts`
