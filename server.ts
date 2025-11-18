@@ -168,10 +168,6 @@ async function handleReactionAdded(event: any) {
 
    if (messageResponse.error) {
         console.error(`✗ Failed to fetch message from history: ${messageResponse.error}`);
-     // Provide helpful error for MPIM/DM issues
-        if (messageResponse.error === "not_in_channel" || messageResponse.error === "channel_not_found") {
-          console.error(`✗ Bot is not a member of this conversation. For group DMs, invite the bot using: /invite @YourBotName`);
-        }
       } else if (messageResponse.messages && messageResponse.messages.length > 0) {
         console.log(`Found ${messageResponse.messages.length} messages in time range`);
         // Log first few timestamps for debugging
@@ -418,13 +414,6 @@ async function handleReactionAdded(event: any) {
     if (postResponse.error) {
       console.error(`✗ Failed to post translation: ${postResponse.error}`);
       console.error(`✗ Post response:`, JSON.stringify(postResponse, null, 2));
-       // Provide helpful error messages for common issues
-      if (postResponse.error === "not_in_channel" || postResponse.error === "channel_not_found") {
-        console.error(`✗ Bot is not a member of this conversation. For group DMs, invite the bot using: /invite @YourBotName`);
-        console.error(`✗ Or use the slash command: /invite-translator`);
-      } else if (postResponse.error === "missing_scope") {
-        console.error(`✗ Bot is missing required scopes. Add mpim:history, mpim:write, and im:history scopes.`);
-      }
       return;
     }
 
@@ -753,111 +742,6 @@ async function handleReactionRemoved(event: any) {
   }
 }
 
-// Handle slash command to invite bot to group DM
-// Note: Slack automatically routes slash commands to the app that created them.
-// The botToken used here is already scoped to the specific app, so this will
-// always work with the correct bot, even if multiple apps are installed.
-async function handleSlashCommand(payload: any): Promise<Response> {
-  try {
-    const command = payload.command;
-    const channelId = payload.channel_id;
-    const userId = payload.user_id;
-    const responseUrl = payload.response_url;
-
-    console.log(`Slash command received: ${command} in channel ${channelId} by user ${userId}`);
-
-    if (command === "/invite-translator") {
-      // Get bot user ID - this uses the botToken which is scoped to this specific app
-      const authResponse = await slackApi("auth.test", {});
-      if (authResponse.error) {
-        console.error(`Failed to get bot info: ${authResponse.error}`);
-        return new Response(JSON.stringify({
-          response_type: "ephemeral",
-          text: "❌ Failed to get bot information. Please try again later."
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      const botUserId = authResponse.user_id;
-      const botUserName = authResponse.user;
-
-      // Try to open/join the conversation (works for group DMs)
-      // For group DMs, we need to get the user IDs in the conversation
-      const channelInfo = await slackApi("conversations.info", {
-        channel: channelId,
-      });
-
-      if (channelInfo.error) {
-        // If we can't get channel info, try to open the conversation with the bot
-        const openResponse = await slackApi("conversations.open", {
-          users: userId, // Open with the user who ran the command
-        });
-
-        if (openResponse.error && openResponse.error !== "already_open") {
-          console.error(`Failed to open conversation: ${openResponse.error}`);
-          return new Response(JSON.stringify({
-            response_type: "ephemeral",
-            text: `❌ Could not join this conversation. Please manually invite the bot using:\n\`/invite @${botUserName}\``
-          }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-      }
-
-      // Check if bot is already in the channel
-      const membersResponse = await slackApi("conversations.members", {
-        channel: channelId,
-      });
-
-      let isBotInChannel = false;
-      if (!membersResponse.error && membersResponse.members) {
-        isBotInChannel = membersResponse.members.includes(botUserId);
-      }
-
-      if (isBotInChannel) {
-        return new Response(JSON.stringify({
-          response_type: "ephemeral",
-          text: `✅ I'm already in this conversation! You can start using flag reactions (🇯🇵, 🇫🇷, etc.) to translate messages.`
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      // For group DMs, we can't programmatically add the bot
-      // But we can provide instructions
-      return new Response(JSON.stringify({
-        response_type: "ephemeral",
-        text: `📝 To add me to this group DM, please type:\n\`/invite @${botUserName}\`\n\nOnce I'm added, you can use flag reactions (🇯🇵, 🇫🇷, 🇪🇸, etc.) to translate messages!`
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Unknown command
-    return new Response(JSON.stringify({
-      response_type: "ephemeral",
-      text: "❌ Unknown command. Available commands: `/invite-translator`"
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
-  } catch (error) {
-    console.error("Error handling slash command:", error);
-    return new Response(JSON.stringify({
-      response_type: "ephemeral",
-      text: "❌ An error occurred. Please try again later."
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-}
-
 // HTTP request handler
 async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -884,54 +768,6 @@ async function handler(req: Request): Promise<Response> {
         "Expires": "0"
       }
     });
-  }
-
-   // Slack Slash Commands endpoint
-  if (req.method === "POST" && url.pathname === "/slack/commands") {
-    console.log("Received POST request to /slack/commands");
-    try {
-      // Slash commands send URL-encoded form data
-      const bodyText = await req.text();
-      const payload: any = {};
-      const params = new URLSearchParams(bodyText);
-      for (const [key, value] of params.entries()) {
-        payload[key] = value;
-      }
-
-      // Verify request signature (Slash commands use same signature verification)
-      const timestamp = req.headers.get("x-slack-request-timestamp");
-      const signature = req.headers.get("x-slack-signature");
-
-      if (timestamp && signature) {
-        const sigBaseString = `v0:${timestamp}:${bodyText}`;
-        const encoder = new TextEncoder();
-        const key = await crypto.subtle.importKey(
-          "raw",
-          encoder.encode(signingSecret),
-          { name: "HMAC", hash: "SHA-256" },
-          false,
-          ["sign"],
-        );
-        const signatureBytes = await crypto.subtle.sign(
-          "HMAC",
-          key,
-          encoder.encode(sigBaseString),
-        );
-        const computedSignature = "v0=" + Array.from(new Uint8Array(signatureBytes))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-
-        if (signature !== computedSignature) {
-          console.error("Invalid Slack slash command signature");
-          return new Response("Unauthorized", { status: 401 });
-        }
-      }
-
-      return await handleSlashCommand(payload);
-    } catch (error) {
-      console.error("Error processing slash command:", error);
-      return new Response("Internal Server Error", { status: 500 });
-    }
   }
 
   // Slack Events API endpoint
