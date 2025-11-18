@@ -201,7 +201,7 @@ Monitoring Interval:
 
 Click Create Monitor
 
-<img height="500" alt="UptimeRobotMonitoring" src="https://github.com/user-attachments/assets/a514d487-729b-41f3-9cdb-b03821a0e913" />
+<img height="1000" alt="UptimeRobotMonitoring" src="https://github.com/user-attachments/assets/a514d487-729b-41f3-9cdb-b03821a0e913" />
 
 ### Benefits of implementing UptimeRobot
 
