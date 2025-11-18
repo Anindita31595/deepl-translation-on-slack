@@ -52,7 +52,7 @@ Use the [App Manifest file](https://github.com/Anindita31595/deepl-translation-o
 
 Go to https://api.slack.com/apps/ to create your slack app
 
-<img width="518" height="500" alt="slack_app_creation" src="https://github.com/user-attachments/assets/d3564b23-3859-48d5-8622-510fd0fd91e6" />
+<img height="500" alt="slack_app_creation" src="https://github.com/user-attachments/assets/d3564b23-3859-48d5-8622-510fd0fd91e6" />
 
 
   * Click **Create New App** button
