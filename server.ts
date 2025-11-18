@@ -128,6 +128,8 @@ async function handleReactionAdded(event: any) {
     
     if (directThreadResponse.error) {
       console.log(`conversations.replies error (expected if not thread parent): ${directThreadResponse.error}`);
+      // If error is "thread_not_found", the messageTs is likely a thread reply, not a parent
+      // We'll need to search for it in Approach 3
     }
 
     if (!directThreadResponse.error && directThreadResponse.messages) {
@@ -143,14 +145,18 @@ async function handleReactionAdded(event: any) {
         const reply = directThreadResponse.messages.find((msg: any) => msg.ts === messageTs);
         if (reply) {
           targetMessage = reply;
-          threadTs = reply.thread_ts || messageTs;
-          console.log(`✓ Found message in thread replies`);
+         // For thread replies, always use thread_ts (thread parent timestamp)
+          // If thread_ts doesn't exist, use the first message's ts (which is the parent)
+          threadTs = reply.thread_ts || (firstMsg ? firstMsg.ts : messageTs);
+          console.log(`✓ Found message in thread replies (thread reply)`);
           console.log(`✓ Message text exists: ${!!targetMessage.text}`);
+          console.log(`✓ Thread parent timestamp: ${threadTs}`);
         }
       }
     }
 
     // Approach 2: If not found, try conversations.history with time range
+    // Note: This won't find thread replies, only top-level messages
     if (!targetMessage) {
       console.log(`Trying conversations.history with time range around ${messageTs}...`);
       const messageTsNum = parseFloat(messageTs);
@@ -217,25 +223,44 @@ async function handleReactionAdded(event: any) {
     }
 
     // Approach 3: If still not found, search through recent threads
+    // This is critical for thread replies, which aren't in conversations.history
+    // Thread replies can only be found by searching through threads
     if (!targetMessage) {
-      console.log(`Searching through recent threads...`);
+     console.log(`Searching through recent threads for thread replies...`);
+      const messageTsNum = parseFloat(messageTs);
+      
+      // Search a wider time range to find threads that might contain this reply
+      // Use a 2-hour window to catch threads that might have the reply
       const historyResponse = await slackApi("conversations.history", {
         channel: channelId,
-        latest: messageTs,
-        limit: 200,
+        latest: (messageTsNum + 7200).toString(), // Search up to 2 hours after
+        oldest: (messageTsNum - 7200).toString(), // Search up to 2 hours before
+        limit: 500, // Get more messages to check more threads
       });
 
       if (!historyResponse.error && historyResponse.messages) {
-        const recentParents = historyResponse.messages
-          .filter((msg: any) => !msg.thread_ts)
-          .slice(0, 50); // Check up to 50 recent threads
+        // Get all thread parents (messages without thread_ts)
+        const threadParents = historyResponse.messages
+          .filter((msg: any) => !msg.thread_ts);
     
-        for (const parent of recentParents) {
+      console.log(`Found ${threadParents.length} thread parents to check`);
+        
+        // Check threads that are close in time to the message timestamp first
+        // This prioritizes threads that are temporally close to the reply
+        const sortedParents = threadParents.sort((a: any, b: any) => {
+          const aDiff = Math.abs(parseFloat(a.ts) - messageTsNum);
+          const bDiff = Math.abs(parseFloat(b.ts) - messageTsNum);
+          return aDiff - bDiff; // Sort by time difference (closest first)
+        });
+        
+        // Check up to 150 threads (increased to handle busy channels)
+        // Stop early if we find the message
+        for (const parent of sortedParents.slice(0, 150)) {
           const parentTs = parent.ts;
           const threadResponse = await slackApi("conversations.replies", {
             channel: channelId,
             ts: parentTs,
-            limit: 100,
+            limit: 200,
           });
 
          if (!threadResponse.error && threadResponse.messages) {
@@ -246,22 +271,33 @@ async function handleReactionAdded(event: any) {
               threadTs = reply.thread_ts || parentTs;
               console.log(`✓ Found message in thread (parent: ${parentTs})`);
               console.log(`✓ Message text exists: ${!!reply.text}`);
+              console.log(`✓ Thread timestamp: ${threadTs}`);
               break;
             }
           }   
         }
 
-        }
+      } else if (historyResponse.error) {
+        console.error(`✗ Failed to fetch channel history for thread search: ${historyResponse.error}`);
+      }
     }
-
     // If still not found, give up
     if (!targetMessage) {
       console.error(`✗ Message with timestamp ${messageTs} not found after all attempts`);
       return;
     }
 
+    // Ensure threadTs is correctly set for thread replies
+    // If targetMessage is a thread reply, ensure we use its thread_ts
+    if (targetMessage.thread_ts && targetMessage.thread_ts !== threadTs) {
+      console.log(`✓ Updating threadTs: ${threadTs} -> ${targetMessage.thread_ts} (from message.thread_ts)`);
+      threadTs = targetMessage.thread_ts;
+    }
+
     // Check if translation already exists
     // Note: conversations.replies requires the thread parent timestamp
+    // For thread replies, threadTs should be the parent's timestamp
+    console.log(`Checking for existing translations in thread ${threadTs}...`);
     const replies = await slackApi("conversations.replies", {
       channel: channelId,
       ts: threadTs,
@@ -404,11 +440,14 @@ async function handleReactionAdded(event: any) {
     }
 
     // Post translation with language code prefix
-   console.log(`✓ Posting translation to Slack thread ${threadTs}`);
+    // For thread replies, post in the same thread (using thread parent timestamp)
+    // For parent messages, post in their own thread
+    const isThreadReply = targetMessage.thread_ts !== undefined;
+    console.log(`✓ Posting translation to Slack thread ${threadTs} (message is ${isThreadReply ? 'a thread reply' : 'a parent message'})`);
     const postResponse = await slackApi("chat.postMessage", {
       channel: channelId,
       text: prefixedTranslation,
-      thread_ts: threadTs,
+      thread_ts: threadTs, // This ensures the translation appears in the correct thread
     });
 
     if (postResponse.error) {
@@ -530,24 +569,37 @@ async function handleReactionRemoved(event: any) {
     }
 
     // If still not found, search through recent threads
+    // This is critical for thread replies, which aren't in conversations.history
     if (!targetMessage) {
+      const messageTsNum = parseFloat(messageTs);
+      console.log(`Searching through recent threads for thread replies...`);
       const historyResponse = await slackApi("conversations.history", {
         channel: channelId,
-        latest: messageTs,
-        limit: 200,
+        latest: (messageTsNum + 7200).toString(), // Search up to 2 hours after
+        oldest: (messageTsNum - 7200).toString(), // Search up to 2 hours before
+        limit: 500,
       });
 
       if (!historyResponse.error && historyResponse.messages) {
-        const recentParents = historyResponse.messages
-          .filter((msg: any) => !msg.thread_ts)
-          .slice(0, 50);
+        const threadParents = historyResponse.messages
+          .filter((msg: any) => !msg.thread_ts);
         
-        for (const parent of recentParents) {
+        console.log(`Found ${threadParents.length} thread parents to check`);
+        
+        // Sort by time difference to check closest threads first
+        const sortedParents = threadParents.sort((a: any, b: any) => {
+          const aDiff = Math.abs(parseFloat(a.ts) - messageTsNum);
+          const bDiff = Math.abs(parseFloat(b.ts) - messageTsNum);
+          return aDiff - bDiff;
+        });
+        
+         // Check up to 150 threads
+        for (const parent of sortedParents.slice(0, 150)) {
           const parentTs = parent.ts;
           const threadResponse = await slackApi("conversations.replies", {
             channel: channelId,
             ts: parentTs,
-            limit: 100,
+            limit: 200,
           });
 
           if (!threadResponse.error && threadResponse.messages) {
@@ -556,10 +608,13 @@ async function handleReactionRemoved(event: any) {
               targetMessage = reply;
               threadTs = reply.thread_ts || parentTs;
               console.log(`✓ Found message in thread (parent: ${parentTs})`);
+              console.log(`✓ Thread timestamp: ${threadTs}`);
               break;
             }
           }
         }
+      }else if (historyResponse.error) {
+        console.error(`✗ Failed to fetch channel history for thread search: ${historyResponse.error}`);
       }
     }
 
