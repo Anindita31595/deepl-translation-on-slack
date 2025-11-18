@@ -49,6 +49,7 @@ for the next section.
 ### Create your Slack App
 
 Use the [App Manifest file](https://github.com/Anindita31595/deepl-translation-on-slack/blob/0287bd60b8692d0a6f6edf96f20edd1e9825efb3/SlackApp_manifest.json) to configure a new app!
+
 Go to https://api.slack.com/apps/ to create your slack app
 
 <img height="500"" alt="slack_app_creation" src="https://github.com/user-attachments/assets/292935fc-fc00-4d7a-83e9-27b511317d11" />
