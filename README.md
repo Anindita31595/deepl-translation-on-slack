@@ -111,12 +111,11 @@ The name can be anything, but it might be a good idea to give it an easy-to-reme
 
 * Go to 👉 https://render.com
   * Click “New +” → “Web Service”
-  * Connect your GitHub account (if not already)
-  * Select your github repository (deepl-translation-on-slack)
-
+  * Connect your GitHub/bitbucket account (if not already)
+  * Select your github/bitbucket repository 
 **Configure:**
 
- - Name: deepl-translation-on-slack
+ - Name: deepl-translation-on-slack/any name
  - Region: any/Singapore (fastest for Japan)
  - Branch: main
  - Language: Docker
